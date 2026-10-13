@@ -1,0 +1,698 @@
+(function () {
+  'use strict';
+  var $ = function (s) { return document.querySelector(s); };
+
+  /* ---------- возврат по ссылке из письма (читаем адрес до того, как его обработает клиент) ---------- */
+  var linkNote = null, linkWelcome = false;
+  (function () {
+    var raw = (location.hash || '').replace(/^#/, '') || (location.search || '').replace(/^\?/, '');
+    if (!raw) return;
+    var p = new URLSearchParams(raw);
+    var code = (p.get('error_code') || '').toLowerCase();
+    if (code || p.get('error')) {
+      if (code === 'otp_expired' || /expired|invalid/i.test(p.get('error_description') || '')) {
+        linkNote = { kind: 'ok', resend: true, text: 'Эта ссылка уже использована или устарела. Часто письма «открывают» сами почтовые сервисы, и тогда почта уже подтверждена: просто войди. Если вход не получается, отправь письмо ещё раз.' };
+      } else {
+        linkNote = { kind: 'err', resend: true, text: 'Не удалось подтвердить почту по ссылке. Попробуй войти или отправь письмо ещё раз.' };
+      }
+    } else if (p.get('type') === 'signup' && p.get('access_token')) {
+      linkWelcome = true;
+    }
+  })();
+
+  /* ---------- настройка ---------- */
+  var cfg = window.QUESTLOG_CONFIG || {};
+  var configured = !!(cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY &&
+    /^https:\/\//.test(cfg.SUPABASE_URL) && cfg.SUPABASE_URL.indexOf('YOUR-') < 0 && cfg.SUPABASE_ANON_KEY.indexOf('YOUR-') < 0);
+  var sb = (configured && window.supabase) ? window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY) : null;
+  var BUCKET = 'covers';
+
+  var STATUS = {
+    playing: { label: 'Играю', color: 'var(--play)' },
+    queue: { label: 'В очереди', color: 'var(--queue)' },
+    beaten: { label: 'Пройдено', color: 'var(--done)' },
+    wish: { label: 'Хочу', color: 'var(--wish)' },
+    dropped: { label: 'Брошено', color: 'var(--drop)' }
+  };
+  var ORDER = ['playing', 'queue', 'beaten', 'wish', 'dropped'];
+  var RANKS = ['Новичок', 'Искатель', 'Следопыт', 'Ветеран', 'Герой', 'Легенда', 'Хранитель карт'];
+
+  var HEART = ['.XX..XX.', 'XXXXXXXX', 'XXXXXXXX', 'XXXXXXXX', '.XXXXXX.', '..XXXX..', '...XX...'];
+  var CART = [
+    '..XXXXXXXX..', '.X........X.', '.X.XXXXXX.X.', '.X.X....X.X.', '.X.X....X.X.', '.X.XXXXXX.X.',
+    '.X........X.', '.X..XXXX..X.', '.XXXXXXXXXXX', '.XX.XXXX.XX.', '.XX.XXXX.XX.', '.XXXXXXXXXXX'
+  ];
+  var STAR = ['..X..', '.XXX.', 'XXXXX', '.XXX.', '.X.X.'];
+  var SUN = ['....X....', '.X..X..X.', '..X...X..', '...XXX...', 'XX.XXX.XX', '...XXX...', '..X...X..', '.X..X..X.', '....X....'];
+  var MOON = ['...XXXX..', '..XXXX...', '.XXXX....', '.XXXX....', '.XXXX....', '.XXXX....', '..XXXX..X', '...XXXXXX', '.....XXX.'];
+
+  /* ---------- состояние ---------- */
+  var games = [];
+  var user = null;
+  var booted = false;
+  var loaded = false;
+  var recovering = false;
+  var chains = {};
+  var view = { tab: 'all', q: '', sort: 'updated' };
+  var draft = null;
+  var opener = null;
+  var toastTimer = null;
+  var authMode = 'in';
+  var armedDelete = false;
+
+  /* ---------- утилиты ---------- */
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function uuid() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    var b = new Uint8Array(16); crypto.getRandomValues(b);
+    b[6] = (b[6] & 15) | 64; b[8] = (b[8] & 63) | 128;
+    var h = Array.prototype.map.call(b, function (x) { return ('0' + x.toString(16)).slice(-2); }).join('');
+    return h.slice(0, 8) + '-' + h.slice(8, 12) + '-' + h.slice(12, 16) + '-' + h.slice(16, 20) + '-' + h.slice(20);
+  }
+  function pix(map, size, fill) {
+    var r = '';
+    for (var y = 0; y < map.length; y++) for (var x = 0; x < map[y].length; x++)
+      if (map[y][x] === 'X') r += '<rect x="' + x + '" y="' + y + '" width="1" height="1"/>';
+    return '<svg viewBox="0 0 ' + map[0].length + ' ' + map.length + '" width="' + size + '" height="' + Math.round(size * map.length / map[0].length) + '" fill="' + (fill || 'currentColor') + '" aria-hidden="true">' + r + '</svg>';
+  }
+  function hash(s) {
+    var h = 2166136261;
+    for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return h >>> 0;
+  }
+  function sprite(title) {
+    var h = hash((title || '?').toLowerCase());
+    var r = h || 1;
+    function rnd() { r ^= r << 13; r >>>= 0; r ^= r >>> 17; r ^= r << 5; r >>>= 0; return r; }
+    var hue = h % 360, hue2 = (hue + 150) % 360;
+    var body = 'hsl(' + hue + ' 70% 56%)', eye = 'hsl(' + hue2 + ' 85% 70%)';
+    var out = '';
+    for (var y = 0; y < 7; y++) {
+      for (var x = 0; x < 4; x++) {
+        var on = (rnd() % 100) < (x === 3 ? 70 : 52);
+        if (!on) continue;
+        var c = (y === 2 && x === 1) ? eye : body;
+        out += '<rect x="' + x + '" y="' + y + '" width="1" height="1" fill="' + c + '"/>';
+        if (x !== 3) out += '<rect x="' + (6 - x) + '" y="' + y + '" width="1" height="1" fill="' + c + '"/>';
+      }
+    }
+    return '<svg viewBox="0 0 7 7" width="100%" height="100%" aria-hidden="true">' + out + '</svg>';
+  }
+  function stars(n, size) {
+    var out = '<span class="stars" role="img" aria-label="Оценка ' + n + ' из 5">';
+    for (var i = 1; i <= 5; i++) out += '<span class="' + (i <= n ? '' : 'off') + '">' + pix(STAR, size) + '</span>';
+    return out + '</span>';
+  }
+  function seg(n, total) {
+    var out = '';
+    for (var i = 0; i < total; i++) out += '<i class="' + (i < n ? 'on' : '') + '"></i>';
+    return out;
+  }
+  function fmt(h) { h = Number(h) || 0; return Number.isInteger(h) ? String(h) : h.toFixed(1); }
+  function toast(msg) {
+    var t = $('#toast'); t.textContent = msg; t.hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.hidden = true; }, 3200);
+  }
+  function errText(e) {
+    var m = String((e && e.message) || '').toLowerCase();
+    if (m.indexOf('games_limit_reached') >= 0) return 'Достигнут лимит: 500 игр на аккаунт.';
+    if (m.indexOf('jwt') >= 0 || m.indexOf('not authenticated') >= 0) return 'Сессия истекла. Войди заново.';
+    return 'Не удалось сохранить. Проверь соединение и попробуй ещё раз.';
+  }
+
+  /* ---------- данные ---------- */
+  function coverUrl(path, stamp) {
+    if (!path) return '';
+    var u = sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+    return u + '?v=' + (Date.parse(stamp) || Date.now());
+  }
+  function fromRow(r) {
+    return {
+      id: r.id, title: r.title, platform: r.platform || '', genre: r.genre || '', status: r.status,
+      progress: r.progress || 0, hours: Number(r.hours) || 0, rating: r.rating || 0, notes: r.notes || '',
+      cover_path: r.cover_path || null, cover: coverUrl(r.cover_path, r.updated_at),
+      updated: Date.parse(r.updated_at) || 0, added: Date.parse(r.created_at) || 0
+    };
+  }
+  function toRow(g, path) {
+    return {
+      id: g.id, user_id: user.id, title: g.title, platform: g.platform || '', genre: g.genre || '',
+      status: g.status, progress: Math.max(0, Math.min(100, Math.round(g.progress || 0))),
+      hours: Math.max(0, Math.min(9999, Math.round((Number(g.hours) || 0) * 10) / 10)),
+      rating: Math.max(0, Math.min(5, Math.round(g.rating || 0))), notes: g.notes || '', cover_path: path || null
+    };
+  }
+  function queue(id, fn) {
+    var p = (chains[id] || Promise.resolve()).then(fn);
+    chains[id] = p.catch(function () {});
+    return p;
+  }
+  async function loadGames() {
+    var r = await sb.from('games').select('*').order('updated_at', { ascending: false }).limit(500);
+    if (r.error) { toast('Не удалось загрузить игры. Обнови страницу.'); return; }
+    games = r.data.map(fromRow); loaded = true; render();
+  }
+  function saveGame(g, blob, removeCover) {
+    g.updated = Date.now(); if (!g.added) g.added = g.updated;
+    var i = games.findIndex(function (x) { return x.id === g.id; });
+    if (i >= 0) games[i] = g; else games.push(g);
+    render();
+    var snap = Object.assign({}, g);
+    return queue(snap.id, async function () {
+      var path = snap.cover_path || null;
+      if (blob) {
+        path = user.id + '/' + snap.id + '.jpg';
+        var up = await sb.storage.from(BUCKET).upload(path, blob, { upsert: true, contentType: 'image/jpeg', cacheControl: '3600' });
+        if (up.error) throw up.error;
+      } else if (removeCover && path) {
+        await sb.storage.from(BUCKET).remove([path]);
+        path = null;
+      }
+      var r = await sb.from('games').upsert(toRow(snap, path)).select('id,updated_at').single();
+      if (r.error) throw r.error;
+      var cur = games.find(function (x) { return x.id === snap.id; });
+      if (cur) {
+        cur.cover_path = path;
+        if (blob || removeCover) cur.cover = path ? coverUrl(path, r.data.updated_at) : '';
+        render();
+      }
+    }).catch(function (e) { toast(errText(e)); loadGames(); });
+  }
+  function removeGame(id) {
+    var g = games.find(function (x) { return x.id === id; });
+    games = games.filter(function (x) { return x.id !== id; });
+    render();
+    return queue(id, async function () {
+      if (g && g.cover_path) await sb.storage.from(BUCKET).remove([g.cover_path]);
+      var r = await sb.from('games').delete().eq('id', id);
+      if (r.error) throw r.error;
+    }).catch(function (e) { toast(errText(e)); loadGames(); });
+  }
+
+  /* ---------- производные ---------- */
+  function profile() {
+    var beaten = 0, playing = 0, hours = 0, rs = 0, rn = 0;
+    games.forEach(function (g) {
+      if (g.status === 'beaten') beaten++;
+      if (g.status === 'playing') playing++;
+      hours += Number(g.hours) || 0;
+      if (g.rating > 0) { rs += g.rating; rn++; }
+    });
+    var xp = beaten * 120 + Math.round(hours) * 3 + playing * 15;
+    var lvl = 1 + Math.floor(Math.sqrt(xp / 60));
+    var lo = (lvl - 1) * (lvl - 1) * 60, hi = lvl * lvl * 60;
+    return { n: games.length, hours: hours, beaten: beaten, avg: rn ? rs / rn : null, xp: xp, lvl: lvl, lo: lo, hi: hi };
+  }
+  function visible() {
+    var q = view.q.trim().toLowerCase();
+    var list = games.filter(function (g) {
+      if (view.tab !== 'all' && g.status !== view.tab) return false;
+      if (!q) return true;
+      return [g.title, g.genre, g.platform, g.notes].join(' ').toLowerCase().indexOf(q) >= 0;
+    });
+    var s = view.sort;
+    list.sort(function (a, b) {
+      if (s === 'rating') return (b.rating || 0) - (a.rating || 0) || (b.updated || 0) - (a.updated || 0);
+      if (s === 'hours') return (b.hours || 0) - (a.hours || 0);
+      if (s === 'title') return String(a.title).localeCompare(String(b.title), 'ru');
+      return (b.updated || 0) - (a.updated || 0);
+    });
+    return list;
+  }
+
+  /* ---------- отрисовка ---------- */
+  function renderHud() {
+    var p = profile();
+    $('#lvl').textContent = 'LVL ' + String(p.lvl).padStart(2, '0');
+    $('#rank').textContent = RANKS[Math.min(p.lvl - 1, RANKS.length - 1)];
+    $('#xp').textContent = 'XP ' + p.xp;
+    $('#xp-next').textContent = 'до LVL ' + (p.lvl + 1) + ': ' + (p.hi - p.xp);
+    $('#xpbar').innerHTML = seg(Math.round(20 * (p.xp - p.lo) / (p.hi - p.lo)), 20);
+    $('#s-games').textContent = p.n;
+    $('#s-hours').textContent = fmt(Math.round(p.hours * 10) / 10);
+    $('#s-done').textContent = p.beaten;
+    $('#s-avg').textContent = p.avg == null ? '—' : p.avg.toFixed(1);
+  }
+  function renderTabs() {
+    var counts = { all: games.length };
+    ORDER.forEach(function (k) { counts[k] = 0; });
+    games.forEach(function (g) { if (counts[g.status] != null) counts[g.status]++; });
+    var html = '';
+    ['all'].concat(ORDER).forEach(function (k) {
+      var label = k === 'all' ? 'Все' : STATUS[k].label;
+      html += '<button class="tab" type="button" data-tab="' + k + '" aria-pressed="' + (view.tab === k) + '">' + label + '<span class="n">' + counts[k] + '</span></button>';
+    });
+    $('#tabs').innerHTML = html;
+  }
+  function card(g) {
+    var st = STATUS[g.status] || STATUS.queue;
+    var segs = Math.round((g.status === 'beaten' ? 100 : (g.progress || 0)) / 10);
+    var h = '<article class="panel card" style="--c:' + st.color + '">';
+    h += '<div class="cover" data-act="edit" data-id="' + esc(g.id) + '" aria-hidden="true">' + (g.cover ? '<img src="' + esc(g.cover) + '" alt="">' : sprite(g.title)) + '</div><div class="cbody">';
+    h += '<button class="head" type="button" data-act="edit" data-id="' + esc(g.id) + '" aria-label="Изменить: ' + esc(g.title) + '">';
+    h += '<span class="ht"><span class="title">' + esc(g.title) + '</span>';
+    h += '<span class="meta">' + esc(g.platform || 'Платформа не указана') + '</span></span></button>';
+    h += '<div class="badges"><span class="badge"><i></i>' + st.label + '</span>' + (g.genre ? '<span class="badge plain">' + esc(g.genre) + '</span>' : '') + '</div>';
+    if (g.status !== 'wish') {
+      h += '<div class="prog"><div class="prog-l"><span>Прогресс</span><span>' + (g.status === 'beaten' ? 100 : (g.progress || 0)) + '%</span></div><div class="segbar" style="--c:' + st.color + '">' + seg(segs, 10) + '</div></div>';
+    }
+    if (g.notes) h += '<p class="note">' + esc(g.notes) + '</p>';
+    h += '<div class="foot">' + (g.rating > 0 ? stars(g.rating, 14) : '<span class="meta">Без оценки</span>');
+    h += '<span class="hours">' + (g.status === 'playing' ? '<button class="plus" type="button" data-act="plus" data-id="' + esc(g.id) + '" aria-label="Добавить час к «' + esc(g.title) + '»">+1 Ч</button>' : '') + fmt(g.hours) + ' Ч</span></div>';
+    return h + '</div></article>';
+  }
+  function renderGrid() {
+    var el = $('#grid');
+    if (!loaded) {
+      el.innerHTML = '<div class="panel empty" style="grid-column:1/-1"><h2>Загрузка<span class="blink">_</span></h2></div>';
+      return;
+    }
+    if (!games.length) {
+      el.innerHTML = '<div class="panel empty" style="grid-column:1/-1"><div style="color:var(--accent)">' + pix(CART, 72) + '</div>' +
+        '<h2>Картридж пуст<span class="blink">_</span></h2><p>Здесь будет твоя коллекция: во что играешь, что ждёт в очереди, что уже пройдено. Добавь первую игру или загрузи несколько примеров, чтобы посмотреть, как всё выглядит.</p>' +
+        '<div class="row"><button class="btn primary" type="button" data-act="new">+ Новая игра</button><button class="btn" type="button" data-act="demo">Загрузить примеры</button></div></div>';
+      return;
+    }
+    var list = visible();
+    if (!list.length) {
+      el.innerHTML = '<div class="panel empty" style="grid-column:1/-1"><h2>Ничего не найдено</h2><p>В этом разделе нет игр по такому запросу. Смени вкладку или очисти поиск.</p></div>';
+      return;
+    }
+    el.innerHTML = list.map(card).join('');
+  }
+  function render() { renderHud(); renderTabs(); renderGrid(); }
+
+  /* ---------- окно игры ---------- */
+  function drawSeg() {
+    $('#f-status').innerHTML = ORDER.map(function (k) {
+      return '<button class="opt" type="button" data-st="' + k + '" style="--c:' + STATUS[k].color + '" aria-pressed="' + (draft.status === k) + '"><i></i>' + STATUS[k].label + '</button>';
+    }).join('');
+  }
+  function drawRate() {
+    var h = '';
+    for (var i = 1; i <= 5; i++) h += '<button class="rs' + (i <= draft.rating ? ' on' : '') + '" type="button" data-r="' + i + '" aria-label="Оценка ' + i + '">' + pix(STAR, 26) + '</button>';
+    h += '<small>' + (draft.rating ? draft.rating + ' из 5' : 'без оценки') + '</small>';
+    $('#f-rate').innerHTML = h;
+  }
+  function drawCover() {
+    $('#f-cerr').hidden = true;
+    $('#f-prev').innerHTML = draft.cover ? '<img src="' + esc(draft.cover) + '" alt="Предпросмотр обложки">' : '<span class="hint">Нет<br>обложки</span>';
+    $('#f-cdel').hidden = !draft.cover;
+    $('#f-pick').textContent = draft.cover ? 'Заменить' : 'Выбрать файл';
+  }
+  function readCover(file) {
+    return new Promise(function (res, rej) {
+      if (!file || !/^image\//.test(file.type)) return rej(new Error('type'));
+      var url = URL.createObjectURL(file), img = new Image();
+      img.onload = function () {
+        var W = 300, H = 400, c = document.createElement('canvas');
+        c.width = W; c.height = H;
+        var x = c.getContext('2d');
+        x.fillStyle = '#fff'; x.fillRect(0, 0, W, H);
+        var s = Math.max(W / img.naturalWidth, H / img.naturalHeight);
+        var w = img.naturalWidth * s, h = img.naturalHeight * s;
+        x.drawImage(img, (W - w) / 2, (H - h) / 2, w, h);
+        URL.revokeObjectURL(url);
+        c.toBlob(function (b) { b ? res(b) : rej(new Error('blob')); }, 'image/jpeg', 0.82);
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); rej(new Error('load')); };
+      img.src = url;
+    });
+  }
+  function setCover(file) {
+    readCover(file).then(function (b) {
+      if (!draft) return;
+      if (draft.coverBlobUrl) URL.revokeObjectURL(draft.coverBlobUrl);
+      draft.coverBlob = b; draft.coverBlobUrl = URL.createObjectURL(b);
+      draft.cover = draft.coverBlobUrl; draft.coverRemove = false;
+      drawCover();
+    }).catch(function () { $('#f-cerr').hidden = false; });
+  }
+  function resetDelete() { armedDelete = false; var b = $('#f-del'); b.classList.remove('armed'); b.textContent = 'Удалить'; }
+  function openModal(id) {
+    opener = document.activeElement;
+    var g = id ? games.find(function (x) { return x.id === id; }) : null;
+    draft = g ? Object.assign({}, g) : { id: uuid(), title: '', platform: '', genre: '', status: 'queue', progress: 0, hours: 0, rating: 0, notes: '', cover: '', cover_path: null };
+    $('#m-title').textContent = g ? 'Изменить игру' : 'Новая игра';
+    $('#f-title').value = draft.title;
+    $('#f-platform').value = draft.platform || '';
+    $('#f-genre').value = draft.genre || '';
+    $('#f-hours').value = draft.hours || 0;
+    $('#f-progress').value = draft.progress || 0;
+    $('#f-pv').textContent = (draft.progress || 0) + '%';
+    $('#f-notes').value = draft.notes || '';
+    $('#f-err').hidden = true;
+    $('#f-del').hidden = !g;
+    $('#f-save').disabled = false;
+    resetDelete(); drawSeg(); drawRate(); drawCover();
+    $('#ov').hidden = false;
+    setTimeout(function () { $('#f-title').focus(); }, 0);
+  }
+  function closeModal() {
+    $('#ov').hidden = true;
+    if (draft && draft.coverBlobUrl && draft.cover !== draft.coverBlobUrl) URL.revokeObjectURL(draft.coverBlobUrl);
+    draft = null;
+    if (opener && opener.focus && document.contains(opener)) opener.focus();
+  }
+
+  /* ---------- вход и аккаунт ---------- */
+  var MODES = {
+    'in': { title: 'Вход', submit: 'Войти', toggle: 'Нет аккаунта? Зарегистрироваться', email: true, pass: true, forgot: true, google: true, auto: 'current-password' },
+    'up': { title: 'Регистрация', submit: 'Создать аккаунт', toggle: 'Уже есть аккаунт? Войти', email: true, pass: true, forgot: false, google: true, auto: 'new-password' },
+    'forgot': { title: 'Сброс пароля', submit: 'Отправить ссылку', toggle: 'Вернуться ко входу', email: true, pass: false, forgot: false, google: false },
+    'reset': { title: 'Новый пароль', submit: 'Сохранить пароль', toggle: '', email: false, pass: true, forgot: false, google: false, auto: 'new-password' }
+  };
+  function authMsg(kind, text) {
+    $('#a-err').hidden = kind !== 'err'; $('#a-ok').hidden = kind !== 'ok';
+    if (kind === 'err') $('#a-err').textContent = text;
+    if (kind === 'ok') $('#a-ok').textContent = text;
+  }
+  function showAuth(mode) {
+    authMode = mode;
+    var m = MODES[mode];
+    $('#boot').hidden = true;
+    $('#a-title').textContent = m.title;
+    $('#a-submit').textContent = m.submit;
+    $('#a-toggle').textContent = m.toggle; $('#a-toggle').hidden = !m.toggle;
+    $('#a-forgot').hidden = !m.forgot;
+    $('#a-email-l').hidden = !m.email;
+    $('#a-pass-l').hidden = !m.pass;
+    if (m.auto) $('#a-pass').setAttribute('autocomplete', m.auto);
+    var g = !!cfg.GOOGLE_LOGIN && m.google;
+    $('#a-google').hidden = !g; $('#a-or').hidden = !g;
+    $('#a-sub').hidden = mode !== 'in' && mode !== 'up';
+    authMsg('none');
+    $('#a-resend').hidden = true;
+    $('#auth').hidden = false;
+    setTimeout(function () { var f = m.email ? $('#a-email') : $('#a-pass'); if (f) f.focus(); }, 0);
+  }
+  function hideAuth() { $('#auth').hidden = true; $('#a-pass').value = ''; }
+  function authMessage(e) {
+    var m = String((e && e.message) || '').toLowerCase(), c = String((e && e.code) || '').toLowerCase();
+    if (m.indexOf('invalid login') >= 0) return 'Неверная почта или пароль.';
+    if (m.indexOf('not confirmed') >= 0 || c === 'email_not_confirmed') return 'Почта не подтверждена. Открой письмо со ссылкой и попробуй снова.';
+    if (m.indexOf('already registered') >= 0 || c === 'user_already_exists') return 'Такая почта уже зарегистрирована. Попробуй войти.';
+    if (m.indexOf('at least') >= 0 || c === 'weak_password') return 'Пароль слишком простой. Используй не меньше 8 символов.';
+    if (m.indexOf('rate limit') >= 0 || c.indexOf('rate_limit') >= 0 || (e && e.status === 429)) {
+      var w = /after (\d+) seconds?/.exec(m);
+      return w ? 'Слишком часто. Подожди ' + w[1] + ' с и повтори.' : 'Слишком много попыток. Подожди немного и повтори. Письма отправляются не чаще нескольких раз в час.';
+    }
+    if (m.indexOf('same password') >= 0 || c === 'same_password') return 'Новый пароль должен отличаться от старого.';
+    if (m.indexOf('failed to fetch') >= 0 || m.indexOf('network') >= 0) return 'Нет соединения. Проверь интернет.';
+    return 'Что-то пошло не так. Попробуй ещё раз.';
+  }
+  function busy(on) { $('#a-submit').disabled = on; $('#a-google').disabled = on; $('#a-resend').disabled = on; }
+  function back() { return location.origin + location.pathname; }
+  function isUnconfirmed(e) {
+    return String((e && e.code) || '').toLowerCase() === 'email_not_confirmed' || String((e && e.message) || '').toLowerCase().indexOf('not confirmed') >= 0;
+  }
+
+  /* ---------- тема ---------- */
+  function applyTheme(t, persist) {
+    document.documentElement.setAttribute('data-theme', t);
+    if (persist) { try { localStorage.setItem('gamelog.theme', t); } catch (e) {} }
+    var b = $('#theme');
+    if (b) {
+      b.innerHTML = pix(t === 'dark' ? MOON : SUN, 20);
+      var label = 'Тема: ' + (t === 'dark' ? 'тёмная' : 'светлая') + '. Переключить';
+      b.setAttribute('aria-label', label); b.title = label;
+    }
+    var m = document.querySelector('meta[name="theme-color"]');
+    if (m) m.setAttribute('content', t === 'dark' ? '#15122e' : '#cdd6ad');
+  }
+
+  async function submitAuth(e) {
+    e.preventDefault();
+    authMsg('none');
+    var email = $('#a-email').value.trim(), pass = $('#a-pass').value;
+    if (authMode !== 'reset' && !/^\S+@\S+\.\S+$/.test(email)) return authMsg('err', 'Введи почту в формате name@example.com.');
+    if (authMode === 'in' && !pass) return authMsg('err', 'Введи пароль.');
+    if ((authMode === 'up' || authMode === 'reset') && pass.length < 8) return authMsg('err', 'Пароль должен быть не короче 8 символов.');
+    busy(true);
+    try {
+      if (authMode === 'in') {
+        var r1 = await sb.auth.signInWithPassword({ email: email, password: pass });
+        if (r1.error) throw r1.error;
+      } else if (authMode === 'up') {
+        var r2 = await sb.auth.signUp({ email: email, password: pass, options: { emailRedirectTo: back() } });
+        if (r2.error) throw r2.error;
+        if (!r2.data.session) {
+          var ids = r2.data.user && r2.data.user.identities;
+          if (Array.isArray(ids) && ids.length === 0) {
+            authMsg('err', 'Такая почта уже зарегистрирована. Войди или сбрось пароль.');
+          } else {
+            authMsg('ok', 'Письмо отправлено на ' + email + '. Открой его и нажми на ссылку. Если ссылка пишет, что устарела, почта уже подтверждена (почтовые сервисы иногда открывают ссылки сами): просто войди.');
+            $('#a-resend').hidden = false;
+          }
+          $('#a-pass').value = '';
+        }
+      } else if (authMode === 'forgot') {
+        var r3 = await sb.auth.resetPasswordForEmail(email, { redirectTo: back() });
+        if (r3.error) throw r3.error;
+        authMsg('ok', 'Если такая почта есть, мы отправили на неё ссылку для сброса пароля.');
+      } else if (authMode === 'reset') {
+        var r4 = await sb.auth.updateUser({ password: pass });
+        if (r4.error) throw r4.error;
+        recovering = false; booted = false; user = null;
+        var s = await sb.auth.getSession();
+        handleSession(s.data.session);
+        toast('Пароль обновлён');
+      }
+    } catch (err) {
+      authMsg('err', authMessage(err));
+      if (authMode === 'in' && isUnconfirmed(err)) $('#a-resend').hidden = false;
+    } finally { busy(false); }
+  }
+
+  function openAccount() {
+    $('#acc-mail').textContent = user ? (user.email || '') : '';
+    $('#acc').hidden = false;
+    var d = $('#acc-del'); d.classList.remove('armed'); d.textContent = 'Удалить аккаунт';
+  }
+  function exportData() {
+    var payload = {
+      exported_at: new Date().toISOString(),
+      games: games.map(function (g) {
+        return { title: g.title, platform: g.platform, genre: g.genre, status: g.status, progress: g.progress, hours: g.hours, rating: g.rating, notes: g.notes, cover_url: g.cover ? g.cover.split('?')[0] : null };
+      })
+    };
+    var url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }));
+    var a = document.createElement('a');
+    a.href = url; a.download = 'gamelog.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+  async function deleteAccount() {
+    try {
+      var l = await sb.storage.from(BUCKET).list(user.id, { limit: 1000 });
+      if (l.data && l.data.length) await sb.storage.from(BUCKET).remove(l.data.map(function (f) { return user.id + '/' + f.name; }));
+      var r = await sb.rpc('delete_my_account');
+      if (r.error) throw r.error;
+      await sb.auth.signOut({ scope: 'local' });
+      $('#acc').hidden = true;
+      toast('Аккаунт удалён');
+    } catch (e) { toast('Не удалось удалить аккаунт. Попробуй ещё раз.'); }
+  }
+
+  function handleSession(session) {
+    var u = session && session.user ? session.user : null;
+    if (recovering) return;
+    var prev = user ? user.id : null, next = u ? u.id : null;
+    user = u;
+    if (booted && prev === next) return;
+    booted = true;
+    $('#boot').hidden = true;
+    if (!u) {
+      games = []; loaded = false;
+      $('#app').hidden = true; $('#acc').hidden = true; $('#ov').hidden = true;
+      showAuth('in');
+      if (linkNote) { authMsg(linkNote.kind, linkNote.text); $('#a-resend').hidden = !linkNote.resend; linkNote = null; }
+      return;
+    }
+    hideAuth();
+    $('#app').hidden = false;
+    if (linkWelcome) { linkWelcome = false; toast('Почта подтверждена. Добро пожаловать!'); }
+    $('#acct-t').textContent = u.email || 'Аккаунт';
+    loaded = false; render();
+    loadGames();
+  }
+
+  /* ---------- примеры ---------- */
+  function addExamples() {
+    var now = Date.now();
+    var ex = [
+      ['Hades', 'PC', 'Рогалик', 'beaten', 100, 64, 5, 'Финал с десятой попытки.'],
+      ['Hollow Knight', 'Switch', 'Метроидвания', 'playing', 60, 28, 5, 'Застрял в Городе слёз, надо найти карту.'],
+      ['Stardew Valley', 'PC', 'Симулятор фермы', 'playing', 40, 47, 4, 'Второй год, строю курятник.'],
+      ['Celeste', 'Switch', 'Платформер', 'beaten', 100, 11, 5, ''],
+      ['Disco Elysium', 'PC', 'RPG', 'queue', 0, 0, 0, 'Начать на выходных.'],
+      ['Hyper Light Drifter', 'PC', 'Экшен', 'dropped', 30, 6, 3, 'Слишком сложно, вернусь позже.'],
+      ['Tunic', 'PS5', 'Приключение', 'wish', 0, 0, 0, '']
+    ];
+    var local = ex.map(function (r, i) {
+      return { id: uuid(), title: r[0], platform: r[1], genre: r[2], status: r[3], progress: r[4], hours: r[5], rating: r[6], notes: r[7], cover: '', cover_path: null, added: now - i * 1000, updated: now - i * 1000 };
+    });
+    games = games.concat(local); render();
+    sb.from('games').insert(local.map(function (g) { return toRow(g, null); })).then(function (r) {
+      if (r.error) { toast(errText(r.error)); loadGames(); } else { toast('Добавлено 7 примеров'); loadGames(); }
+    });
+  }
+
+  /* ---------- события ---------- */
+  function bind() {
+    $('#tabs').addEventListener('click', function (e) {
+      var b = e.target.closest('[data-tab]'); if (!b) return;
+      view.tab = b.getAttribute('data-tab'); renderTabs(); renderGrid();
+    });
+    $('#q').addEventListener('input', function (e) { view.q = e.target.value; renderGrid(); });
+    $('#sort').addEventListener('change', function (e) { view.sort = e.target.value; renderGrid(); });
+    $('#add').addEventListener('click', function () { openModal(null); });
+    $('#acct').addEventListener('click', openAccount);
+    $('#theme').addEventListener('click', function () {
+      applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark', true);
+    });
+    $('#a-resend').addEventListener('click', async function () {
+      var email = $('#a-email').value.trim();
+      if (!/^\S+@\S+\.\S+$/.test(email)) return authMsg('err', 'Введи почту, на которую отправить письмо.');
+      busy(true);
+      try {
+        var r = await sb.auth.resend({ type: 'signup', email: email, options: { emailRedirectTo: back() } });
+        if (r.error) throw r.error;
+        authMsg('ok', 'Письмо отправлено ещё раз на ' + email + '. Следующее можно запросить через минуту.');
+      } catch (err) { authMsg('err', authMessage(err)); }
+      finally { busy(false); }
+    });
+    $('#grid').addEventListener('click', function (e) {
+      var b = e.target.closest('[data-act]'); if (!b) return;
+      var act = b.getAttribute('data-act'), id = b.getAttribute('data-id');
+      if (act === 'edit') openModal(id);
+      if (act === 'new') openModal(null);
+      if (act === 'demo') addExamples();
+      if (act === 'plus') {
+        var g = games.find(function (x) { return x.id === id; });
+        if (g) { var n = Object.assign({}, g); n.hours = Math.round(((Number(g.hours) || 0) + 1) * 10) / 10; saveGame(n, null, false); }
+      }
+    });
+
+    $('#m-close').addEventListener('click', closeModal);
+    $('#f-cancel').addEventListener('click', closeModal);
+    $('#ov').addEventListener('mousedown', function (e) { if (e.target === $('#ov')) closeModal(); });
+    $('#acc').addEventListener('mousedown', function (e) { if (e.target === $('#acc')) $('#acc').hidden = true; });
+    $('#acc-close').addEventListener('click', function () { $('#acc').hidden = true; });
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape') return;
+      if (!$('#ov').hidden) closeModal(); else if (!$('#acc').hidden) $('#acc').hidden = true;
+    });
+    $('#f-status').addEventListener('click', function (e) {
+      var b = e.target.closest('[data-st]'); if (!b) return;
+      draft.status = b.getAttribute('data-st');
+      if (draft.status === 'beaten') { draft.progress = 100; $('#f-progress').value = 100; $('#f-pv').textContent = '100%'; }
+      drawSeg();
+    });
+    $('#f-rate').addEventListener('click', function (e) {
+      var b = e.target.closest('[data-r]'); if (!b) return;
+      var v = Number(b.getAttribute('data-r'));
+      draft.rating = draft.rating === v ? 0 : v; drawRate();
+    });
+    $('#f-pick').addEventListener('click', function () { $('#f-file').click(); });
+    $('#f-file').addEventListener('change', function (e) {
+      var f = e.target.files && e.target.files[0];
+      if (f) setCover(f);
+      e.target.value = '';
+    });
+    $('#f-cdel').addEventListener('click', function () {
+      if (draft.coverBlobUrl) URL.revokeObjectURL(draft.coverBlobUrl);
+      draft.coverRemove = !!draft.cover_path; draft.coverBlob = null; draft.coverBlobUrl = null; draft.cover = '';
+      drawCover();
+    });
+    var pv = $('#f-prev');
+    ['dragenter', 'dragover'].forEach(function (t) { pv.addEventListener(t, function (e) { e.preventDefault(); pv.classList.add('drag'); }); });
+    ['dragleave', 'drop'].forEach(function (t) { pv.addEventListener(t, function (e) { e.preventDefault(); pv.classList.remove('drag'); }); });
+    pv.addEventListener('drop', function (e) {
+      var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (f) setCover(f);
+    });
+    document.addEventListener('paste', function (e) {
+      if ($('#ov').hidden || !draft) return;
+      var f = e.clipboardData && e.clipboardData.files && e.clipboardData.files[0];
+      if (f && /^image\//.test(f.type)) { e.preventDefault(); setCover(f); }
+    });
+    $('#f-progress').addEventListener('input', function (e) { $('#f-pv').textContent = e.target.value + '%'; });
+    $('#f-del').addEventListener('click', function () {
+      var b = $('#f-del');
+      if (!armedDelete) { armedDelete = true; b.classList.add('armed'); b.textContent = 'Точно удалить?'; return; }
+      var id = draft.id; closeModal(); removeGame(id); toast('Игра удалена');
+    });
+    $('#f').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var title = $('#f-title').value.trim();
+      if (!title) { $('#f-err').hidden = false; $('#f-title').focus(); return; }
+      var hrs = parseFloat($('#f-hours').value);
+      draft.title = title;
+      draft.platform = $('#f-platform').value.trim();
+      draft.genre = $('#f-genre').value.trim();
+      draft.hours = isFinite(hrs) && hrs > 0 ? Math.min(hrs, 9999) : 0;
+      draft.progress = Number($('#f-progress').value) || 0;
+      draft.notes = $('#f-notes').value.trim();
+      var blob = draft.coverBlob || null, rem = !!draft.coverRemove;
+      var g = draft;
+      delete g.coverBlob; delete g.coverBlobUrl; delete g.coverRemove;
+      draft = null; $('#ov').hidden = true;
+      saveGame(g, blob, rem); toast('Сохранено');
+    });
+
+    /* вход */
+    $('#a-form').addEventListener('submit', submitAuth);
+    $('#a-toggle').addEventListener('click', function () { showAuth(authMode === 'in' ? 'up' : 'in'); });
+    $('#a-forgot').addEventListener('click', function () { showAuth('forgot'); });
+    $('#a-google').addEventListener('click', async function () {
+      authMsg('none'); busy(true);
+      var r = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: back() } });
+      if (r.error) { authMsg('err', 'Вход через Google сейчас недоступен.'); busy(false); }
+    });
+
+    /* аккаунт */
+    $('#acc-export').addEventListener('click', exportData);
+    $('#acc-out').addEventListener('click', async function () { $('#acc').hidden = true; await sb.auth.signOut(); });
+    $('#acc-del').addEventListener('click', function () {
+      var b = $('#acc-del');
+      if (!b.classList.contains('armed')) { b.classList.add('armed'); b.textContent = 'Точно удалить всё?'; return; }
+      b.disabled = true; deleteAccount().then(function () { b.disabled = false; });
+    });
+  }
+
+  /* ---------- запуск ---------- */
+  function fatal(text) {
+    $('#boot').innerHTML = '<p>' + esc(text) + '</p>';
+  }
+  function start() {
+    $('#logo').innerHTML = '<div style="color:var(--accent)">' + pix(HEART, 40) + '</div>';
+    $('#a-logo').innerHTML = '<span style="color:var(--accent)">' + pix(HEART, 28) + '</span>';
+    $('#avatar').innerHTML = '<div style="color:var(--accent)">' + pix(HEART, 40) + '</div>';
+    applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light', false);
+    if (cfg.APP_ENV && cfg.APP_ENV !== 'production') {
+      $('#env').hidden = false;
+      document.title = '[ТЕСТ] ' + document.title;
+    }
+    if (!configured) { fatal('НУЖНА НАСТРОЙКА. Впиши адрес проекта и ключ Supabase в файл config.js (см. README).'); return; }
+    if (!sb) { fatal('Не загрузилась библиотека Supabase. Проверь интернет и обнови страницу.'); return; }
+    bind();
+    sb.auth.onAuthStateChange(function (event, session) {
+      // вызываем позже, чтобы не блокировать внутренние запросы клиента
+      setTimeout(function () {
+        if (event === 'PASSWORD_RECOVERY') { recovering = true; user = session && session.user; $('#app').hidden = true; showAuth('reset'); return; }
+        handleSession(session);
+      }, 0);
+    });
+    sb.auth.getSession().then(function (r) {
+      if (!booted && !recovering) handleSession(r.data.session);
+      // клиент уже прочитал параметры из адреса, их можно убрать
+      if (location.hash) { try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {} }
+    });
+  }
+  start();
+})();

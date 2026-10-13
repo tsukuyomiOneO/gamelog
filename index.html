@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GameLOG</title>
+<meta name="description" content="GameLOG: пиксельный трекер игр со статусами, прогрессом, оценками, часами и обложками.">
+<meta name="theme-color" content="#cdd6ad">
+<script src="theme.js"></script>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400..700&family=Press+Start+2P&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="env" id="env" hidden>Тестовый стенд</div>
+
+<div class="boot" id="boot"><p>ЗАГРУЗКА<span class="blink">_</span></p></div>
+
+<div class="wrap" id="app" hidden>
+  <header class="top">
+    <div class="brand">
+      <div id="logo" aria-hidden="true"></div>
+      <h1>GameLOG</h1>
+    </div>
+    <div class="hdr-r">
+      <button class="chip icon" id="theme" type="button"></button>
+      <button class="chip on" id="acct" type="button" title="Аккаунт"><i></i><span class="t" id="acct-t">Аккаунт</span></button>
+    </div>
+  </header>
+
+  <section class="panel hud" aria-label="Профиль игрока">
+    <div class="player">
+      <div class="avatar" id="avatar" aria-hidden="true"></div>
+      <div class="pl-main">
+        <div class="pl-top"><span class="lvl" id="lvl">LVL 01</span><span class="rank" id="rank">Новичок</span></div>
+        <div>
+          <div class="xp-label"><span id="xp">XP 0</span><span id="xp-next"></span></div>
+          <div class="segbar" id="xpbar" role="img" aria-label="Опыт до следующего уровня"></div>
+        </div>
+      </div>
+    </div>
+    <dl class="stats">
+      <div class="stat"><dt>Игр</dt><dd id="s-games">0</dd></div>
+      <div class="stat"><dt>Часов</dt><dd id="s-hours">0</dd></div>
+      <div class="stat"><dt>Пройдено</dt><dd id="s-done">0</dd></div>
+      <div class="stat"><dt>Ср. оценка</dt><dd id="s-avg">—</dd></div>
+    </dl>
+  </section>
+
+  <section class="tools" aria-label="Фильтры">
+    <div class="tabs" id="tabs"></div>
+    <div class="row">
+      <input class="field grow" id="q" type="search" placeholder="Поиск по названию, жанру, платформе" aria-label="Поиск">
+      <select class="field sel" id="sort" aria-label="Сортировка">
+        <option value="updated">Сначала новые</option>
+        <option value="rating">По оценке</option>
+        <option value="hours">По часам</option>
+        <option value="title">По алфавиту</option>
+      </select>
+      <button class="btn primary" id="add" type="button">+ Новая игра</button>
+    </div>
+  </section>
+
+  <main id="grid" class="grid"></main>
+</div>
+
+<!-- Вход и регистрация -->
+<div class="overlay" id="auth" hidden>
+  <div class="panel modal authbox" role="dialog" aria-modal="true" aria-labelledby="a-title">
+    <div class="a-brand"><span id="a-logo" aria-hidden="true"></span>GameLOG</div>
+    <div class="mh"><h2 id="a-title">Вход</h2></div>
+    <p class="hint" id="a-sub">Твой игровой журнал: статусы, прогресс, оценки и обложки. Данные хранятся в аккаунте и доступны с любого устройства.</p>
+    <button class="btn" id="a-google" type="button" hidden>Войти через Google</button>
+    <div class="or" id="a-or" hidden><span>или по почте</span></div>
+    <form id="a-form" novalidate>
+      <label class="lab" id="a-email-l"><span>Почта</span><input class="field" id="a-email" type="email" autocomplete="email" inputmode="email" maxlength="254"></label>
+      <label class="lab" id="a-pass-l"><span>Пароль</span><input class="field" id="a-pass" type="password" autocomplete="current-password" maxlength="72"></label>
+      <p class="err" id="a-err" role="alert" hidden></p>
+      <p class="ok" id="a-ok" role="status" hidden></p>
+      <button class="btn primary" id="a-submit" type="submit">Войти</button>
+    </form>
+    <div class="a-links">
+      <button class="link" id="a-toggle" type="button">Нет аккаунта? Зарегистрироваться</button>
+      <button class="link" id="a-forgot" type="button">Забыли пароль?</button>
+      <button class="link" id="a-resend" type="button" hidden>Отправить письмо ещё раз</button>
+    </div>
+  </div>
+</div>
+
+<!-- Аккаунт -->
+<div class="overlay" id="acc" hidden>
+  <div class="panel modal" role="dialog" aria-modal="true" aria-labelledby="acc-t">
+    <div class="mh">
+      <h2 id="acc-t">Аккаунт</h2>
+      <button class="x" id="acc-close" type="button" aria-label="Закрыть">×</button>
+    </div>
+    <p class="hint" id="acc-mail"></p>
+    <div class="acct-row">
+      <button class="btn" id="acc-export" type="button">Скачать мои данные</button>
+      <button class="btn" id="acc-out" type="button">Выйти</button>
+      <button class="btn danger" id="acc-del" type="button">Удалить аккаунт</button>
+      <p class="hint">Удаление стирает аккаунт, все игры и обложки без возможности восстановления.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Игра -->
+<div class="overlay" id="ov" hidden>
+  <div class="panel modal" role="dialog" aria-modal="true" aria-labelledby="m-title">
+    <div class="mh">
+      <h2 id="m-title">Новая игра</h2>
+      <button class="x" id="m-close" type="button" aria-label="Закрыть">×</button>
+    </div>
+    <form id="f" novalidate>
+      <fieldset>
+        <legend>Обложка</legend>
+        <div class="cp">
+          <div class="cp-prev" id="f-prev"></div>
+          <div class="cp-side">
+            <div class="cp-btns">
+              <button class="btn" id="f-pick" type="button">Выбрать файл</button>
+              <button class="btn danger" id="f-cdel" type="button" hidden>Убрать</button>
+            </div>
+            <input id="f-file" type="file" accept="image/*" hidden>
+            <p class="hint">JPG, PNG или WebP. Можно перетащить файл на рамку или вставить картинку из буфера. Обложка обрезается до формата 3:4 и сжимается.</p>
+            <p class="err" id="f-cerr" hidden>Не удалось прочитать картинку. Попробуй другой файл.</p>
+          </div>
+        </div>
+      </fieldset>
+      <label class="lab"><span>Название</span><input class="field" id="f-title" maxlength="80" autocomplete="off" placeholder="Например, Hollow Knight"></label>
+      <p class="err" id="f-err" hidden>Введи название игры.</p>
+      <div class="two">
+        <label class="lab"><span>Платформа</span><input class="field" id="f-platform" list="platforms" maxlength="30" autocomplete="off" placeholder="PC, Switch…"></label>
+        <label class="lab"><span>Жанр</span><input class="field" id="f-genre" maxlength="30" autocomplete="off" placeholder="RPG, платформер…"></label>
+      </div>
+      <datalist id="platforms"><option value="PC"><option value="PS5"><option value="PS4"><option value="Xbox"><option value="Switch"><option value="Steam Deck"><option value="Mobile"><option value="Retro"></datalist>
+      <fieldset><legend>Статус</legend><div class="seg" id="f-status"></div></fieldset>
+      <div class="two">
+        <label class="lab"><span>Часов в игре</span><input class="field" id="f-hours" type="number" min="0" max="9999" step="0.5" inputmode="decimal" value="0"></label>
+        <label class="lab"><span>Прогресс: <b id="f-pv">0%</b></span><input id="f-progress" type="range" min="0" max="100" step="10" value="0"></label>
+      </div>
+      <fieldset><legend>Оценка</legend><div class="rate" id="f-rate"></div></fieldset>
+      <label class="lab"><span>Заметки</span><textarea class="field" id="f-notes" maxlength="300" placeholder="Что понравилось, где застрял, с кем играешь"></textarea></label>
+      <div class="fa">
+        <button class="btn danger" id="f-del" type="button" hidden>Удалить</button>
+        <div class="right">
+          <button class="btn" id="f-cancel" type="button">Отмена</button>
+          <button class="btn primary" id="f-save" type="submit">Сохранить</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<noscript><p style="padding:24px">Для работы GameLOG нужен JavaScript.</p></noscript>
+
+<!-- Зафиксированная версия клиента Supabase. Чтобы не зависеть от CDN, см. README (раздел "Без CDN"). -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
