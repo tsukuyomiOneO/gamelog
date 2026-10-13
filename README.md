@@ -2,7 +2,7 @@
 
 Пиксельный трекер игр. У каждого человека свой аккаунт и свой журнал: статусы, прогресс, часы, оценки, заметки и обложки.
 
-Бэкенд целиком на Supabase (Postgres, Auth, Storage), хостинг статический (Netlify). Своего сервера нет.
+Бэкенд целиком на Supabase (Postgres, Auth, Storage), хостинг статический (Vercel). Своего сервера нет.
 
 ## Файлы
 
@@ -10,22 +10,17 @@
 |---|---|
 | `index.html`, `styles.css`, `app.js`, `theme.js` | Сайт |
 | `build.mjs` | Сборка: копирует файлы в `dist/` и создаёт `dist/config.js` из переменных окружения |
-| `netlify.toml` | Команда сборки и папка публикации |
-| `_headers` | Заголовки безопасности (CSP) |
+| `vercel.json` | Команда сборки, папка публикации, заголовки безопасности (CSP) |
+| `CHANGELOG.md` | Журнал изменений: что выпущено в прод и когда |
 | `supabase/schema.sql`, `supabase/migrations/` | База, правила доступа (RLS), хранилище обложек, удаление аккаунта |
 | `config.example.js` | Пример конфига для локального запуска |
 
-## Два стенда: тест и прод
+## Тест и прод
 
-Один код, разные базы и разные переменные окружения.
-
-| | Тест | Прод |
-|---|---|---|
-| `APP_ENV` | `staging` | `production` |
-| `SUPABASE_URL`, `SUPABASE_ANON_KEY` | тестовый проект | боевой проект |
-| Внешний вид | красная плашка «Тестовый стенд», `[ТЕСТ]` в заголовке | без пометок |
-
-Порядок работы: правки выкладываются на тест, проверяются, и только после одобрения уходят в прод. Изменения базы сначала применяются к тестовому проекту, потом к боевому.
+- **Прод**: сайт на Vercel, собирается автоматически из ветки `main`. Переменные окружения Production: `SUPABASE_URL`, `SUPABASE_ANON_KEY` (публичный ключ anon или publishable). Пометок стенда нет.
+- **Тест**: только локально, с красной плашкой «Тестовый стенд» и `[ТЕСТ]` в заголовке: `APP_ENV=staging node build.mjs`, затем `python3 -m http.server -d dist 8000`.
+- Preview-деплои Vercel (ветки и pull request) тоже получают плашку, потому что `VERCEL_ENV` равен `preview`.
+- Все изменения записываются в `CHANGELOG.md`.
 
 ## Сборка
 
@@ -38,11 +33,9 @@ node build.mjs
 
 Готовый сайт появится в `dist/`. Сборка откажется работать, если вместо публичного ключа указан `service_role` или `sb_secret_`.
 
-## Деплой на Netlify
+## Деплой на Vercel
 
-Вариант 1, перетаскиванием: соберите `dist/`, откройте сайт в Netlify → Deploys и перетащите содержимое `dist/` (файлы, не папку) в область загрузки.
-
-Вариант 2, из репозитория: подключите репозиторий в Netlify. В переменных окружения задайте `SUPABASE_URL`, `SUPABASE_ANON_KEY` и `APP_ENV`. `netlify.toml` уже содержит команду сборки.
+Репозиторий подключён к Vercel. Настройки сборки берутся из `vercel.json`. В Project Settings → Environment Variables задайте `SUPABASE_URL` и `SUPABASE_ANON_KEY` для Production (и для Preview, если нужны превью). Каждый пуш в `main` выкладывается в прод сам.
 
 ## Подтверждение почты: обязательная настройка
 
@@ -50,10 +43,10 @@ node build.mjs
 
 Supabase → Authentication → URL Configuration:
 
-- **Site URL**: `https://pixel-quest-log.netlify.app` (адрес вашего сайта).
+- **Site URL**: `https://ВАШ-ДОМЕН.vercel.app` (адрес вашего сайта).
 - **Redirect URLs**:
-  - `https://pixel-quest-log.netlify.app/**`
-  - `https://*--pixel-quest-log.netlify.app/**`
+  - `https://ВАШ-ДОМЕН.vercel.app/**`
+  - `https://*-ВАШ-ПРОЕКТ.vercel.app/**`
   - `http://localhost:8000/**`
 
 Пока адрес сайта не внесён в Redirect URLs, Supabase подставляет Site URL по умолчанию (`http://localhost:3000`).

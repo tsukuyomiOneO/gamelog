@@ -6,7 +6,7 @@
 //   SUPABASE_ANON_KEY   публичный ключ anon или publishable (обязательно)
 //   GOOGLE_LOGIN        "true", чтобы показать вход через Google (по желанию)
 //   APP_ENV             "production" или любое другое имя стенда; по умолчанию берётся
-//                       из CONTEXT Netlify (production, deploy-preview, branch-deploy)
+//                       из VERCEL_ENV (production, preview, development) или CONTEXT Netlify
 
 import { cpSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 
@@ -30,11 +30,11 @@ if (jwtRole(key) === 'service_role' || key.startsWith('sb_secret_')) {
   fail('в SUPABASE_ANON_KEY указан секретный ключ. Нужен публичный (anon или publishable).');
 }
 
-const appEnv = (env.APP_ENV || env.CONTEXT || 'production').trim();
+const appEnv = (env.APP_ENV || env.VERCEL_ENV || env.CONTEXT || 'production').trim();
 
 rmSync('dist', { recursive: true, force: true });
 mkdirSync('dist');
-for (const f of ['index.html', 'styles.css', 'app.js', 'theme.js', 'favicon.svg', '_headers']) {
+for (const f of ['index.html', 'styles.css', 'app.js', 'theme.js', 'favicon.svg']) {
   cpSync(f, 'dist/' + f);
 }
 
