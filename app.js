@@ -152,7 +152,7 @@
     return p;
   }
   async function loadGames() {
-    var r = await sb.from('games').select('*').order('updated_at', { ascending: false }).limit(500);
+    var r = await sb.from('games').select('*').eq('user_id', user.id).order('updated_at', { ascending: false }).limit(500);
     if (r.error) { toast('Не удалось загрузить игры. Обнови страницу.'); return; }
     if (viewing) { mine = r.data.map(fromRow); return; }
     games = r.data.map(fromRow); loaded = true; render();
