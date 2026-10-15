@@ -154,6 +154,7 @@
   async function loadGames() {
     var r = await sb.from('games').select('*').order('updated_at', { ascending: false }).limit(500);
     if (r.error) { toast('Не удалось загрузить игры. Обнови страницу.'); return; }
+    if (viewing) { mine = r.data.map(fromRow); return; }
     games = r.data.map(fromRow); loaded = true; render();
   }
   function saveGame(g, blob, removeCover) {
@@ -251,9 +252,10 @@
   function card(g) {
     var st = STATUS[g.status] || STATUS.queue;
     var segs = Math.round((g.status === 'beaten' ? 100 : (g.progress || 0)) / 10);
+    var ro = !!viewing, ed = ro ? '' : ' data-act="edit" data-id="' + esc(g.id) + '"';
     var h = '<article class="panel card" style="--c:' + st.color + '">';
-    h += '<div class="cover" data-act="edit" data-id="' + esc(g.id) + '" aria-hidden="true">' + (g.cover ? '<img src="' + esc(g.cover) + '" alt="">' : sprite(g.title)) + '</div><div class="cbody">';
-    h += '<button class="head" type="button" data-act="edit" data-id="' + esc(g.id) + '" aria-label="Изменить: ' + esc(g.title) + '">';
+    h += '<div class="cover"' + ed + ' aria-hidden="true">' + (g.cover ? '<img src="' + esc(g.cover) + '" alt="">' : sprite(g.title)) + '</div><div class="cbody">';
+    h += '<button class="head" type="button"' + ed + (ro ? ' disabled' : '') + ' aria-label="' + (ro ? '' : 'Изменить: ') + esc(g.title) + '">';
     h += '<span class="ht"><span class="title">' + esc(g.title) + '</span>';
     h += '<span class="meta">' + esc(g.platform || 'Платформа не указана') + '</span></span></button>';
     h += '<div class="badges"><span class="badge"><i></i>' + st.label + '</span>' + (g.genre ? '<span class="badge plain">' + esc(g.genre) + '</span>' : '') + '</div>';
@@ -262,13 +264,17 @@
     }
     if (g.notes) h += '<p class="note">' + esc(g.notes) + '</p>';
     h += '<div class="foot">' + (g.rating > 0 ? stars(g.rating, 14) : '<span class="meta">Без оценки</span>');
-    h += '<span class="hours">' + (g.status === 'playing' ? '<button class="plus" type="button" data-act="plus" data-id="' + esc(g.id) + '" aria-label="Добавить час к «' + esc(g.title) + '»">+1 Ч</button>' : '') + fmt(g.hours) + ' Ч</span></div>';
+    h += '<span class="hours">' + (g.status === 'playing' && !ro ? '<button class="plus" type="button" data-act="plus" data-id="' + esc(g.id) + '" aria-label="Добавить час к «' + esc(g.title) + '»">+1 Ч</button>' : '') + fmt(g.hours) + ' Ч</span></div>';
     return h + '</div></article>';
   }
   function renderGrid() {
     var el = $('#grid');
     if (!loaded) {
       el.innerHTML = '<div class="panel empty" style="grid-column:1/-1"><h2>Загрузка<span class="blink">_</span></h2></div>';
+      return;
+    }
+    if (!games.length && viewing) {
+      el.innerHTML = '<div class="panel empty" style="grid-column:1/-1"><h2>Пока пусто</h2><p>У этого игрока ещё нет игр.</p></div>';
       return;
     }
     if (!games.length) {
@@ -284,7 +290,7 @@
     }
     el.innerHTML = list.map(card).join('');
   }
-  function render() { renderHud(); renderTabs(); renderGrid(); }
+  function render() { renderHud(); renderTabs(); renderGrid(); checkAch(); }
 
   /* ---------- окно игры ---------- */
   function drawSeg() {
@@ -470,6 +476,8 @@
 
   function openAccount() {
     $('#acc-mail').textContent = user ? (user.email || '') : '';
+    $('#acc-nick').value = me.nick; $('#acc-nick-err').hidden = true; $('#acc-share').checked = me.share;
+    $('#acc-ver').textContent = 'GameLOG ' + VERSION;
     $('#acc').hidden = false;
     var d = $('#acc-del'); d.classList.remove('armed'); d.textContent = 'Удалить аккаунт';
   }
@@ -508,6 +516,8 @@
     $('#boot').hidden = true;
     if (!u) {
       games = []; loaded = false;
+      viewing = null; mine = null; socialLoaded = false; rel = { friends: [], incoming: [], outgoing: [] }; me = { nick: '', share: true };
+      setViewing(); $('#fr').hidden = true; $('#aw').hidden = true;
       $('#app').hidden = true; $('#acc').hidden = true; $('#ov').hidden = true;
       showAuth('in');
       if (linkNote) { authMsg(linkNote.kind, linkNote.text); $('#a-resend').hidden = !linkNote.resend; linkNote = null; }
@@ -518,7 +528,7 @@
     if (linkWelcome) { linkWelcome = false; toast('Почта подтверждена. Добро пожаловать!'); }
     $('#acct-t').textContent = u.email || 'Аккаунт';
     loaded = false; render();
-    loadGames();
+    loadGames(); loadProfile(); loadSocial();
   }
 
   /* ---------- примеры ---------- */
@@ -586,6 +596,7 @@
     document.addEventListener('keydown', function (e) {
       if (e.key !== 'Escape') return;
       if (!$('#ov').hidden) closeModal(); else if (!$('#acc').hidden) $('#acc').hidden = true;
+      else if (!$('#fr').hidden) $('#fr').hidden = true; else if (!$('#aw').hidden) $('#aw').hidden = true;
     });
     $('#f-status').addEventListener('click', function (e) {
       var b = e.target.closest('[data-st]'); if (!b) return;
@@ -665,6 +676,292 @@
     });
   }
 
+  /* ---------- Beta v2.0: ники, друзья, достижения ---------- */
+  var VERSION = 'Beta v2.0';
+  var NICK_RE = /^[A-Za-z0-9_А-Яа-яЁё]{3,20}$/;
+  var me = { nick: '', share: true };
+  var rel = { friends: [], incoming: [], outgoing: [] };
+  var socialLoaded = false;
+  var found = null;
+  var viewing = null, mine = null;
+  var armedFriend = null;
+
+  var TROPHY = ['XXXXXXXXX', 'X.XXXXX.X', 'X.XXXXX.X', '.XXXXXXX.', '..XXXXX..', '...XXX...', '...XXX...', '..XXXXX..', '.XXXXXXX.'];
+  var CROWN = ['X...X...X', 'XX..X..XX', 'XXX.X.XXX', 'XXXXXXXXX', 'XXXXXXXXX', 'XXXXXXXXX'];
+  var CLOCK = ['..XXXXX..', '.XX...XX.', 'X...X...X', 'X...X...X', 'X...XXX.X', 'X.......X', '.XX...XX.', '..XXXXX..'];
+  var BOOK = ['XXXXXXXX.', 'X......XX', 'X.XXXX.X.', 'X......X.', 'X.XXXX.X.', 'X......X.', 'XXXXXXXX.'];
+  var FLAME = ['...X...', '..XX...', '..XXX..', '.XXXXX.', 'XXXXXXX', 'XXX.XXX', 'XXX.XXX', '.XXXXX.'];
+  var PAD = ['..XXXXXXX..', '.XXXXXXXXX.', 'XX.XXXXX.XX', 'X...XXX.X.X', 'XX.XXXXX.XX', '.XXXXXXXXX.'];
+  var SKULL = ['.XXXXX.', 'XXXXXXX', 'X..X..X', 'XXXXXXX', '.XXXXX.', '.X.X.X.'];
+  var FRIENDS = ['.XX...XX.', '.XX...XX.', 'XXXX.XXXX', 'XXXX.XXXX', 'X..X.X..X'];
+
+  var ACH = [
+    { id: 'first', name: 'Первый картридж', desc: 'Добавь первую игру', icon: CART, goal: 1, cur: function (s) { return s.n; } },
+    { id: 'ten', name: 'Полка заполняется', desc: 'Собери 10 игр', icon: CART, goal: 10, cur: function (s) { return s.n; } },
+    { id: 'fifty', name: 'Библиотекарь', desc: 'Собери 50 игр', icon: BOOK, goal: 50, cur: function (s) { return s.n; } },
+    { id: 'beat1', name: 'Титры пошли', desc: 'Пройди первую игру', icon: TROPHY, goal: 1, cur: function (s) { return s.beaten; } },
+    { id: 'beat5', name: 'Ветеран', desc: 'Пройди 5 игр', icon: TROPHY, goal: 5, cur: function (s) { return s.beaten; } },
+    { id: 'beat25', name: 'Легенда', desc: 'Пройди 25 игр', icon: CROWN, goal: 25, cur: function (s) { return s.beaten; } },
+    { id: 'h50', name: '50 часов', desc: 'Наиграй 50 часов', icon: CLOCK, goal: 50, cur: function (s) { return s.hours; } },
+    { id: 'h200', name: 'Марафонец', desc: 'Наиграй 200 часов', icon: CLOCK, goal: 200, cur: function (s) { return s.hours; } },
+    { id: 'h1000', name: 'Без выходных', desc: 'Наиграй 1000 часов', icon: FLAME, goal: 1000, cur: function (s) { return s.hours; } },
+    { id: 'rated5', name: 'Критик', desc: 'Оцени 5 игр', icon: STAR, goal: 5, cur: function (s) { return s.rated; } },
+    { id: 'five1', name: 'Шедевр', desc: 'Поставь оценку 5 из 5', icon: STAR, goal: 1, cur: function (s) { return s.five; } },
+    { id: 'plat3', name: 'Мультиплатформа', desc: 'Игры на 3 платформах', icon: PAD, goal: 3, cur: function (s) { return s.platforms; } },
+    { id: 'genre5', name: 'Знаток жанров', desc: 'Игры в 5 разных жанрах', icon: BOOK, goal: 5, cur: function (s) { return s.genres; } },
+    { id: 'drop1', name: 'Не моё', desc: 'Брось игру', icon: SKULL, goal: 1, cur: function (s) { return s.dropped; } },
+    { id: 'wish5', name: 'Мечтатель', desc: 'Добавь 5 игр в «Хочу»', icon: STAR, goal: 5, cur: function (s) { return s.wish; } },
+    { id: 'friend1', name: 'Не один', desc: 'Найди первого друга', icon: FRIENDS, goal: 1, social: true, cur: function (s) { return s.friends; } },
+    { id: 'friend5', name: 'Душа компании', desc: 'Заведи 5 друзей', icon: FRIENDS, goal: 5, social: true, cur: function (s) { return s.friends; } }
+  ];
+
+  function achCalc(list, withSocial) {
+    var s = { n: list.length, beaten: 0, hours: 0, rated: 0, five: 0, dropped: 0, wish: 0, friends: rel.friends.length };
+    var pl = {}, ge = {};
+    list.forEach(function (g) {
+      if (g.status === 'beaten') s.beaten++;
+      if (g.status === 'dropped') s.dropped++;
+      if (g.status === 'wish') s.wish++;
+      s.hours += Number(g.hours) || 0;
+      if (g.rating > 0) s.rated++;
+      if (g.rating === 5) s.five++;
+      if (g.platform) pl[g.platform.toLowerCase()] = 1;
+      if (g.genre) ge[g.genre.toLowerCase()] = 1;
+    });
+    s.platforms = Object.keys(pl).length; s.genres = Object.keys(ge).length;
+    return ACH.filter(function (a) { return withSocial || !a.social; }).map(function (a) {
+      var c = a.cur(s); return { a: a, cur: c, done: c >= a.goal };
+    });
+  }
+  function checkAch() {
+    if (viewing || !loaded || !user || !socialLoaded) return;
+    var done = achCalc(games, true).filter(function (x) { return x.done; }).map(function (x) { return x.a.id; });
+    var key = 'gamelog.ach.' + user.id, prev = null;
+    try { prev = JSON.parse(localStorage.getItem(key) || 'null'); } catch (e) {}
+    if (Array.isArray(prev)) {
+      var fresh = ACH.filter(function (a) { return done.indexOf(a.id) >= 0 && prev.indexOf(a.id) < 0; });
+      if (fresh.length) toast('Достижение: ' + fresh.map(function (a) { return a.name; }).join(', '));
+    }
+    try { localStorage.setItem(key, JSON.stringify(done)); } catch (e) {}
+  }
+  function openAch() {
+    var own = !viewing;
+    var items = achCalc(games, own);
+    var n = items.filter(function (x) { return x.done; }).length;
+    $('#aw-t').textContent = own ? 'Достижения' : 'Достижения: ' + viewing.nick;
+    $('#aw-sub').textContent = 'Открыто ' + n + ' из ' + items.length;
+    $('#aw-grid').innerHTML = items.map(function (x) {
+      var cur = Math.min(Math.floor(x.cur), x.a.goal);
+      return '<div class="ach' + (x.done ? '' : ' lock') + '"><span class="ai">' + pix(x.a.icon, 28) + '</span>' +
+        '<span class="an">' + esc(x.a.name) + '</span><span class="ad">' + esc(x.a.desc) + '</span>' +
+        '<div class="segbar" style="--c:var(--star)">' + seg(Math.round(10 * cur / x.a.goal), 10) + '</div>' +
+        '<span class="ad">' + cur + ' / ' + x.a.goal + '</span></div>';
+    }).join('');
+    $('#aw').hidden = false;
+  }
+
+  async function loadProfile() {
+    var r = await sb.from('profiles').select('nick,share_collection').eq('user_id', user.id).maybeSingle();
+    if (r.error || !r.data) return;
+    me.nick = r.data.nick; me.share = r.data.share_collection !== false;
+    $('#acct-t').textContent = me.nick;
+  }
+  async function loadSocial() {
+    if (!user) return;
+    var r = await sb.from('friendships').select('id,requester,addressee,status');
+    if (r.error) return;
+    var ids = {};
+    r.data.forEach(function (f) { ids[f.requester === user.id ? f.addressee : f.requester] = 1; });
+    var list = Object.keys(ids), pr = {};
+    if (list.length) {
+      var p = await sb.from('profiles').select('user_id,nick,share_collection').in('user_id', list);
+      if (p.error) return;
+      p.data.forEach(function (x) { pr[x.user_id] = x; });
+    }
+    var next = { friends: [], incoming: [], outgoing: [] };
+    r.data.forEach(function (f) {
+      var out = f.requester === user.id, uid = out ? f.addressee : f.requester, x = pr[uid] || {};
+      var it = { id: f.id, uid: uid, nick: x.nick || '?', share: x.share_collection !== false };
+      if (f.status === 'accepted') next.friends.push(it); else if (out) next.outgoing.push(it); else next.incoming.push(it);
+    });
+    next.friends.sort(function (a, b) { return a.nick.localeCompare(b.nick, 'ru'); });
+    rel = next; socialLoaded = true;
+    updateBadge(); checkAch();
+    if (!$('#fr').hidden) renderFriends();
+  }
+  function updateBadge() {
+    var b = $('#fr-badge'); if (!b) return;
+    var n = rel.incoming.length; b.hidden = !n; b.textContent = n > 9 ? '9+' : String(n);
+  }
+  function relOf(uid) {
+    if (rel.friends.some(function (x) { return x.uid === uid; })) return 'friend';
+    if (rel.outgoing.some(function (x) { return x.uid === uid; })) return 'out';
+    if (rel.incoming.some(function (x) { return x.uid === uid; })) return 'in';
+    return '';
+  }
+  function incomingId(uid) {
+    var f = rel.incoming.filter(function (x) { return x.uid === uid; })[0]; return f ? f.id : '';
+  }
+  function fbtn(act, attrs, label, cls) {
+    return '<button class="btn s' + (cls ? ' ' + cls : '') + '" type="button" data-fa="' + act + '" ' + attrs + '>' + label + '</button>';
+  }
+  function frow(nick, btns) {
+    return '<div class="frow"><span class="fnick">' + esc(nick) + '</span><span class="fbtns">' + btns + '</span></div>';
+  }
+  function renderFriends() {
+    var h = '';
+    if (found) {
+      h += '<section class="fsec"><h3>Результаты поиска</h3>';
+      if (!found.length) h += '<p class="hint">Игрок с таким ником не найден.</p>';
+      found.forEach(function (p) {
+        var st = relOf(p.user_id), b;
+        if (st === 'friend') b = '<span class="hint">в друзьях</span>';
+        else if (st === 'out') b = '<span class="hint">заявка отправлена</span>';
+        else if (st === 'in') b = fbtn('accept', 'data-id="' + esc(incomingId(p.user_id)) + '"', 'Принять', 'primary');
+        else b = fbtn('add', 'data-nick="' + esc(p.nick) + '"', 'Добавить', 'primary');
+        h += frow(p.nick, b);
+      });
+      h += '</section>';
+    }
+    if (rel.incoming.length) {
+      h += '<section class="fsec"><h3>Входящие заявки</h3>';
+      rel.incoming.forEach(function (f) {
+        h += frow(f.nick, fbtn('accept', 'data-id="' + esc(f.id) + '"', 'Принять', 'primary') + fbtn('decline', 'data-id="' + esc(f.id) + '"', 'Отклонить'));
+      });
+      h += '</section>';
+    }
+    h += '<section class="fsec"><h3>Мои друзья' + (rel.friends.length ? ' · ' + rel.friends.length : '') + '</h3>';
+    if (!rel.friends.length) h += '<p class="hint">Пока никого. Найди игрока по нику и отправь заявку.</p>';
+    rel.friends.forEach(function (f) {
+      h += frow(f.nick,
+        fbtn('view', 'data-uid="' + esc(f.uid) + '" data-nick="' + esc(f.nick) + '"', f.share ? 'Коллекция' : 'Закрыто', f.share ? '' : 'off') +
+        fbtn('remove', 'data-id="' + esc(f.id) + '"', armedFriend === f.id ? 'Точно?' : 'Убрать', armedFriend === f.id ? 'danger armed' : 'danger'));
+    });
+    h += '</section>';
+    if (rel.outgoing.length) {
+      h += '<section class="fsec"><h3>Отправленные заявки</h3>';
+      rel.outgoing.forEach(function (f) { h += frow(f.nick, fbtn('cancel', 'data-id="' + esc(f.id) + '"', 'Отменить')); });
+      h += '</section>';
+    }
+    $('#fr-body').innerHTML = h;
+  }
+  function showFrErr(t) { var e = $('#fr-err'); e.textContent = t; e.hidden = false; }
+  function friendErr(e) {
+    var m = String((e && e.message) || '');
+    if (m.indexOf('no_such_nick') >= 0) return 'Игрока с таким ником нет.';
+    if (/\bself\b/.test(m)) return 'Это твой собственный ник.';
+    if (m.indexOf('already_friends') >= 0) return 'Вы уже друзья.';
+    if (m.indexOf('already_sent') >= 0) return 'Заявка уже отправлена.';
+    if (m.indexOf('friends_limit') >= 0) return 'Достигнут лимит: 200 друзей.';
+    if (m.indexOf('no_such_request') >= 0) return 'Заявка уже недоступна. Список обновлён.';
+    return 'Не получилось. Проверь соединение и попробуй ещё раз.';
+  }
+  function openFriends() {
+    found = null; armedFriend = null;
+    $('#fr-q').value = ''; $('#fr-err').hidden = true;
+    renderFriends();
+    $('#fr').hidden = false;
+    loadSocial();
+  }
+  async function searchFriends(e) {
+    e.preventDefault(); $('#fr-err').hidden = true;
+    var q = $('#fr-q').value.trim();
+    if (q.length < 2) return showFrErr('Введи хотя бы 2 символа ника.');
+    var pat = q.replace(/[\\%_]/g, function (c) { return '\\' + c; }) + '%';
+    var r = await sb.from('profiles').select('user_id,nick').ilike('nick', pat).neq('user_id', user.id).order('nick').limit(8);
+    if (r.error) return showFrErr('Поиск не удался. Попробуй ещё раз.');
+    found = r.data; renderFriends();
+  }
+  async function friendAction(b) {
+    var act = b.getAttribute('data-fa'), id = b.getAttribute('data-id');
+    if (act === 'view') return viewFriend(b.getAttribute('data-uid'), b.getAttribute('data-nick'));
+    if (act === 'remove' && armedFriend !== id) { armedFriend = id; return renderFriends(); }
+    armedFriend = null; $('#fr-err').hidden = true;
+    b.disabled = true;
+    try {
+      if (act === 'add') {
+        var r = await sb.rpc('friend_request', { p_nick: b.getAttribute('data-nick') });
+        if (r.error) throw r.error;
+        toast(r.data === 'accepted' ? 'Вы теперь друзья' : 'Заявка отправлена');
+      } else if (act === 'accept' || act === 'decline') {
+        var r2 = await sb.rpc('friend_respond', { p_id: id, p_accept: act === 'accept' });
+        if (r2.error) throw r2.error;
+        toast(act === 'accept' ? 'Заявка принята' : 'Заявка отклонена');
+      } else {
+        var r3 = await sb.from('friendships').delete().eq('id', id);
+        if (r3.error) throw r3.error;
+      }
+    } catch (err) { showFrErr(friendErr(err)); }
+    await loadSocial();
+  }
+
+  function setViewing() {
+    $('#viewing').hidden = !viewing;
+    if (viewing) $('#v-nick').textContent = viewing.nick;
+    $('#add').hidden = !!viewing;
+    $('#app').classList.toggle('ro', !!viewing);
+    view = { tab: 'all', q: '', sort: 'updated' };
+    $('#q').value = ''; $('#sort').value = 'updated';
+  }
+  async function viewFriend(uid, nick) {
+    var f = rel.friends.filter(function (x) { return x.uid === uid; })[0];
+    if (f && !f.share) { toast('Игрок закрыл свою коллекцию'); return; }
+    var r = await sb.from('games').select('*').eq('user_id', uid).order('updated_at', { ascending: false }).limit(500);
+    if (r.error) { toast('Не удалось загрузить коллекцию'); return; }
+    if (!viewing) mine = games;
+    viewing = { id: uid, nick: nick };
+    games = r.data.map(fromRow); loaded = true;
+    $('#fr').hidden = true;
+    setViewing(); render();
+    window.scrollTo(0, 0);
+  }
+  function leaveView() {
+    if (!viewing) return;
+    games = mine || []; mine = null; viewing = null;
+    setViewing(); render();
+  }
+
+  function bindSocial() {
+    $('#ver').textContent = VERSION;
+    $('#awards').innerHTML = pix(TROPHY, 20);
+    $('#friends').innerHTML = pix(FRIENDS, 20) + '<span class="nb" id="fr-badge" hidden></span>';
+    $('#awards').addEventListener('click', openAch);
+    $('#friends').addEventListener('click', openFriends);
+    $('#v-back').addEventListener('click', leaveView);
+    $('#fr-close').addEventListener('click', function () { $('#fr').hidden = true; });
+    $('#aw-close').addEventListener('click', function () { $('#aw').hidden = true; });
+    $('#fr').addEventListener('mousedown', function (e) { if (e.target === $('#fr')) $('#fr').hidden = true; });
+    $('#aw').addEventListener('mousedown', function (e) { if (e.target === $('#aw')) $('#aw').hidden = true; });
+    $('#fr-form').addEventListener('submit', searchFriends);
+    $('#fr-body').addEventListener('click', function (e) {
+      var b = e.target.closest('[data-fa]'); if (b && !b.disabled) friendAction(b);
+    });
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden && user) loadSocial();
+    });
+    $('#nick-form').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      var n = $('#acc-nick').value.trim(), er = $('#acc-nick-err');
+      er.hidden = true;
+      if (!NICK_RE.test(n)) { er.textContent = 'Ник: 3–20 символов, только буквы, цифры и _.'; er.hidden = false; return; }
+      if (n === me.nick) return;
+      var b = $('#acc-nick-save'); b.disabled = true;
+      var r = await sb.from('profiles').update({ nick: n }).eq('user_id', user.id).select('nick').single();
+      b.disabled = false;
+      if (r.error) {
+        var dup = r.error.code === '23505' || /duplicate|nick_lower/i.test(r.error.message || '');
+        er.textContent = dup ? 'Этот ник уже занят. Выбери другой.' : 'Не удалось сменить ник. Попробуй ещё раз.';
+        er.hidden = false; return;
+      }
+      me.nick = r.data.nick; $('#acct-t').textContent = me.nick; toast('Ник изменён');
+    });
+    $('#acc-share').addEventListener('change', async function (e) {
+      var v = e.target.checked;
+      var r = await sb.from('profiles').update({ share_collection: v }).eq('user_id', user.id);
+      if (r.error) { e.target.checked = !v; toast('Не удалось сохранить настройку'); } else me.share = v;
+    });
+  }
+
   /* ---------- запуск ---------- */
   function fatal(text) {
     $('#boot').innerHTML = '<p>' + esc(text) + '</p>';
@@ -680,7 +977,7 @@
     }
     if (!configured) { fatal('НУЖНА НАСТРОЙКА. Впиши адрес проекта и ключ Supabase в файл config.js (см. README).'); return; }
     if (!sb) { fatal('Не загрузилась библиотека Supabase. Проверь интернет и обнови страницу.'); return; }
-    bind();
+    bind(); bindSocial();
     sb.auth.onAuthStateChange(function (event, session) {
       // вызываем позже, чтобы не блокировать внутренние запросы клиента
       setTimeout(function () {

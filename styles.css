@@ -343,3 +343,33 @@ select.field {
 .env { display: block; max-width: 1080px; margin: 0 auto 14px; text-align: center; padding: 7px 10px; box-shadow: 4px 4px 0 var(--shadow); }
 .hdr-r { margin-left: auto; }
 @media (max-width: 340px) { .hdr-r .chip .t { max-width: 6ch; } }
+
+/* Beta v2.0: версия, друзья, достижения */
+.bt { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ver { font: 700 10px/1 var(--f-body); letter-spacing: 0.6px; text-transform: uppercase; color: var(--accent); }
+.chip.icon { position: relative; }
+.nb { position: absolute; top: -9px; right: -9px; min-width: 20px; padding: 2px 4px; text-align: center; font: 700 11px/1.2 var(--f-body); background: var(--accent); color: var(--on-accent); border: 3px solid var(--line); }
+.btn.s { padding: 7px 10px; font-size: 12px; box-shadow: 3px 3px 0 var(--shadow); }
+.btn.off { opacity: 0.55; }
+.viewing { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 14px; padding: 12px 14px; }
+.viewing b { font-family: var(--f-pixel); font-size: 18px; overflow-wrap: anywhere; }
+.ro .cover { cursor: default; }
+.head:disabled { cursor: default; color: inherit; }
+.chk { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; }
+.chk input { width: 20px; height: 20px; margin: 0; flex: none; accent-color: var(--accent); }
+.fsec { display: flex; flex-direction: column; gap: 10px; }
+.fsec + .fsec, #fr-body:not(:empty) { margin-top: 2px; }
+#fr-body { display: flex; flex-direction: column; gap: 18px; }
+.fsec h3 { margin: 0; font: 600 12px/1.4 var(--f-body); letter-spacing: 0.4px; color: var(--dim); text-transform: uppercase; }
+.frow { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; border: 3px solid var(--line); background: var(--field); padding: 8px 10px; }
+.fnick { font: 600 18px/1.2 var(--f-pixel); overflow-wrap: anywhere; min-width: 0; }
+.fbtns { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.ach-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.ach { border: 3px solid var(--line); background: var(--field); padding: 10px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; min-width: 0; }
+.ach .segbar { width: 100%; height: 12px; }
+.ach .ai { color: var(--star); }
+.ach.lock { opacity: 0.55; }
+.ach.lock .ai { color: var(--faint); }
+.an { font: 600 16px/1.2 var(--f-pixel); overflow-wrap: anywhere; }
+.ad { font-size: 12px; color: var(--dim); }
+@media (max-width: 760px) { .hdr-r { flex-wrap: wrap; } }

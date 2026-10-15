@@ -22,13 +22,17 @@
   <header class="top">
     <div class="brand">
       <div id="logo" aria-hidden="true"></div>
-      <h1>GameLOG</h1>
+      <div class="bt"><h1>GameLOG</h1><span class="ver" id="ver"></span></div>
     </div>
     <div class="hdr-r">
+      <button class="chip icon" id="awards" type="button" title="Достижения" aria-label="Достижения"></button>
+      <button class="chip icon" id="friends" type="button" title="Друзья" aria-label="Друзья"></button>
       <button class="chip icon" id="theme" type="button"></button>
       <button class="chip on" id="acct" type="button" title="Аккаунт"><i></i><span class="t" id="acct-t">Аккаунт</span></button>
     </div>
   </header>
+
+  <div class="panel viewing" id="viewing" hidden><span>Коллекция игрока <b id="v-nick"></b>. Только просмотр.</span><button class="btn s" id="v-back" type="button">← Моя коллекция</button></div>
 
   <section class="panel hud" aria-label="Профиль игрока">
     <div class="player">
@@ -97,12 +101,48 @@
       <button class="x" id="acc-close" type="button" aria-label="Закрыть">×</button>
     </div>
     <p class="hint" id="acc-mail"></p>
+    <form id="nick-form" novalidate>
+      <label class="lab"><span>Ник</span><input class="field" id="acc-nick" maxlength="20" autocomplete="off" spellcheck="false"></label>
+      <p class="hint">3–20 символов: буквы, цифры и _. Двух одинаковых ников не бывает, свой можно менять когда угодно.</p>
+      <p class="err" id="acc-nick-err" hidden></p>
+      <button class="btn" id="acc-nick-save" type="submit">Сменить ник</button>
+    </form>
+    <label class="chk"><input type="checkbox" id="acc-share"><span>Друзья видят мою коллекцию</span></label>
     <div class="acct-row">
       <button class="btn" id="acc-export" type="button">Скачать мои данные</button>
       <button class="btn" id="acc-out" type="button">Выйти</button>
       <button class="btn danger" id="acc-del" type="button">Удалить аккаунт</button>
       <p class="hint">Удаление стирает аккаунт, все игры и обложки без возможности восстановления.</p>
     </div>
+    <p class="hint" id="acc-ver"></p>
+  </div>
+</div>
+
+<!-- Друзья -->
+<div class="overlay" id="fr" hidden>
+  <div class="panel modal" role="dialog" aria-modal="true" aria-labelledby="fr-t">
+    <div class="mh">
+      <h2 id="fr-t">Друзья</h2>
+      <button class="x" id="fr-close" type="button" aria-label="Закрыть">×</button>
+    </div>
+    <form id="fr-form" novalidate>
+      <label class="lab"><span>Найти игрока по нику</span><input class="field" id="fr-q" maxlength="20" autocomplete="off" spellcheck="false" placeholder="Ник"></label>
+      <button class="btn primary" type="submit">Найти</button>
+    </form>
+    <p class="err" id="fr-err" role="alert" hidden></p>
+    <div id="fr-body"></div>
+  </div>
+</div>
+
+<!-- Достижения -->
+<div class="overlay" id="aw" hidden>
+  <div class="panel modal" role="dialog" aria-modal="true" aria-labelledby="aw-t">
+    <div class="mh">
+      <h2 id="aw-t">Достижения</h2>
+      <button class="x" id="aw-close" type="button" aria-label="Закрыть">×</button>
+    </div>
+    <p class="hint" id="aw-sub"></p>
+    <div class="ach-grid" id="aw-grid"></div>
   </div>
 </div>
 
