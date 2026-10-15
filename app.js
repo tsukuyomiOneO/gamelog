@@ -290,7 +290,7 @@
     }
     el.innerHTML = list.map(card).join('');
   }
-  function render() { renderHud(); renderTabs(); renderGrid(); checkAch(); }
+  function render() { renderHud(); renderTabs(); renderGrid(); drawAvatar(); checkAch(); }
 
   /* ---------- окно игры ---------- */
   function drawSeg() {
@@ -477,6 +477,7 @@
   function openAccount() {
     $('#acc-mail').textContent = user ? (user.email || '') : '';
     $('#acc-nick').value = me.nick; $('#acc-nick-err').hidden = true; $('#acc-share').checked = me.share;
+    $('#acc-bio').value = me.bio; $('#acc-fav').value = me.fav; $('#acc-prof-err').hidden = true; drawAvPicker();
     $('#acc-ver').textContent = 'GameLOG ' + VERSION;
     $('#acc').hidden = false;
     var d = $('#acc-del'); d.classList.remove('armed'); d.textContent = 'Удалить аккаунт';
@@ -516,7 +517,7 @@
     $('#boot').hidden = true;
     if (!u) {
       games = []; loaded = false;
-      viewing = null; mine = null; socialLoaded = false; rel = { friends: [], incoming: [], outgoing: [] }; me = { nick: '', share: true };
+      viewing = null; mine = null; socialLoaded = false; rel = { friends: [], incoming: [], outgoing: [] }; me = { nick: '', share: true, avatar: 0, bio: '', fav: '' };
       setViewing(); $('#fr').hidden = true; $('#aw').hidden = true;
       $('#app').hidden = true; $('#acc').hidden = true; $('#ov').hidden = true;
       showAuth('in');
@@ -677,9 +678,9 @@
   }
 
   /* ---------- Beta v2.0: ники, друзья, достижения ---------- */
-  var VERSION = 'Beta v2.0';
+  var VERSION = 'Beta v2.1';
   var NICK_RE = /^[A-Za-z0-9_А-Яа-яЁё]{3,20}$/;
-  var me = { nick: '', share: true };
+  var me = { nick: '', share: true, avatar: 0, bio: '', fav: '' };
   var rel = { friends: [], incoming: [], outgoing: [] };
   var socialLoaded = false;
   var found = null;
@@ -694,6 +695,29 @@
   var PAD = ['..XXXXXXX..', '.XXXXXXXXX.', 'XX.XXXXX.XX', 'X...XXX.X.X', 'XX.XXXXX.XX', '.XXXXXXXXX.'];
   var SKULL = ['.XXXXX.', 'XXXXXXX', 'X..X..X', 'XXXXXXX', '.XXXXX.', '.X.X.X.'];
   var FRIENDS = ['.XX...XX.', '.XX...XX.', 'XXXX.XXXX', 'XXXX.XXXX', 'X..X.X..X'];
+
+  var SLIME = ['........', '..XXXX..', '.XXXXXX.', 'XX.XX.XX', 'XXXXXXXX', 'XXXXXXXX', '.XXXXXX.', '........'];
+  var GHOST = ['..XXXX..', '.XXXXXX.', 'XX.XX.XX', 'XXXXXXXX', 'XXXXXXXX', 'XXXXXXXX', 'XX.XX.XX', 'X..XX..X'];
+  var ROBOT = ['...XX...', '..XXXX..', 'XXXXXXXX', 'X.XXXX.X', 'XXXXXXXX', 'XXXXXXXX', '.XX..XX.', '.XX..XX.'];
+  var CAT = ['X......X', 'XX....XX', 'XXXXXXXX', 'X.XXXX.X', 'XXXXXXXX', 'XXX..XXX', '.XXXXXX.', '........'];
+  var MUSH = ['..XXXX..', '.XXXXXX.', 'XX.XX.XX', 'XXXXXXXX', '..XXXX..', '..XXXX..', '..XXXX..', '.XXXXXX.'];
+  var ALIEN = ['..X..X..', '...XX...', '.XXXXXX.', 'XX.XX.XX', 'XXXXXXXX', '.X.XX.X.', '.X....X.', '........'];
+  var SWORD = ['.....XXX', '....XXXX', '...XXXX.', 'X.XXXX..', 'XXXXX...', '.XXX....', 'XXXX....', 'XX.XX...'];
+  var AVATARS = [HEART, SLIME, GHOST, ROBOT, CAT, MUSH, ALIEN, SWORD, SKULL, PAD, CROWN, STAR];
+  var AV_COL = ['var(--accent)', 'var(--play)', 'var(--done)', 'var(--queue)', 'var(--star)', 'var(--drop)'];
+  function avHtml(i, size) {
+    i = Number(i) || 0; if (i < 0 || i >= AVATARS.length) i = 0;
+    return '<span class="avs" style="color:' + AV_COL[i % AV_COL.length] + '">' + pix(AVATARS[i], size) + '</span>';
+  }
+  function drawAvatar() {
+    var a = $('#avatar'); if (!a) return;
+    a.innerHTML = avHtml(viewing ? viewing.avatar : me.avatar, 40);
+  }
+  function drawAvPicker() {
+    var h = '';
+    for (var i = 0; i < AVATARS.length; i++) h += '<button class="av-b" type="button" data-av="' + i + '" aria-pressed="' + (me.avatar === i) + '" aria-label="Аватар ' + (i + 1) + '">' + avHtml(i, 28) + '</button>';
+    $('#acc-av').innerHTML = h;
+  }
 
   var ACH = [
     { id: 'first', name: 'Первый картридж', desc: 'Добавь первую игру', icon: CART, goal: 1, cur: function (s) { return s.n; } },
@@ -761,10 +785,11 @@
   }
 
   async function loadProfile() {
-    var r = await sb.from('profiles').select('nick,share_collection').eq('user_id', user.id).maybeSingle();
+    var r = await sb.from('profiles').select('nick,share_collection,avatar,bio,fav_game').eq('user_id', user.id).maybeSingle();
     if (r.error || !r.data) return;
     me.nick = r.data.nick; me.share = r.data.share_collection !== false;
-    $('#acct-t').textContent = me.nick;
+    me.avatar = Number(r.data.avatar) || 0; me.bio = r.data.bio || ''; me.fav = r.data.fav_game || '';
+    $('#acct-t').textContent = me.nick; drawAvatar();
   }
   async function loadSocial() {
     if (!user) return;
@@ -774,14 +799,14 @@
     r.data.forEach(function (f) { ids[f.requester === user.id ? f.addressee : f.requester] = 1; });
     var list = Object.keys(ids), pr = {};
     if (list.length) {
-      var p = await sb.from('profiles').select('user_id,nick,share_collection').in('user_id', list);
+      var p = await sb.from('profiles').select('user_id,nick,share_collection,avatar,bio,fav_game').in('user_id', list);
       if (p.error) return;
       p.data.forEach(function (x) { pr[x.user_id] = x; });
     }
     var next = { friends: [], incoming: [], outgoing: [] };
     r.data.forEach(function (f) {
       var out = f.requester === user.id, uid = out ? f.addressee : f.requester, x = pr[uid] || {};
-      var it = { id: f.id, uid: uid, nick: x.nick || '?', share: x.share_collection !== false };
+      var it = { id: f.id, uid: uid, nick: x.nick || '?', share: x.share_collection !== false, avatar: Number(x.avatar) || 0, bio: x.bio || '', fav: x.fav_game || '' };
       if (f.status === 'accepted') next.friends.push(it); else if (out) next.outgoing.push(it); else next.incoming.push(it);
     });
     next.friends.sort(function (a, b) { return a.nick.localeCompare(b.nick, 'ru'); });
@@ -805,8 +830,9 @@
   function fbtn(act, attrs, label, cls) {
     return '<button class="btn s' + (cls ? ' ' + cls : '') + '" type="button" data-fa="' + act + '" ' + attrs + '>' + label + '</button>';
   }
-  function frow(nick, btns) {
-    return '<div class="frow"><span class="fnick">' + esc(nick) + '</span><span class="fbtns">' + btns + '</span></div>';
+  function frow(it, btns) {
+    var sub = it.fav ? '<span class="fsub">Любимая: ' + esc(it.fav) + '</span>' : (it.bio ? '<span class="fsub">' + esc(it.bio) + '</span>' : '');
+    return '<div class="frow"><span class="fwho"><span class="fav">' + avHtml(it.avatar, 24) + '</span><span class="fname"><span class="fnick">' + esc(it.nick) + '</span>' + sub + '</span></span><span class="fbtns">' + btns + '</span></div>';
   }
   function renderFriends() {
     var h = '';
@@ -819,28 +845,28 @@
         else if (st === 'out') b = '<span class="hint">заявка отправлена</span>';
         else if (st === 'in') b = fbtn('accept', 'data-id="' + esc(incomingId(p.user_id)) + '"', 'Принять', 'primary');
         else b = fbtn('add', 'data-nick="' + esc(p.nick) + '"', 'Добавить', 'primary');
-        h += frow(p.nick, b);
+        h += frow(p, b);
       });
       h += '</section>';
     }
     if (rel.incoming.length) {
       h += '<section class="fsec"><h3>Входящие заявки</h3>';
       rel.incoming.forEach(function (f) {
-        h += frow(f.nick, fbtn('accept', 'data-id="' + esc(f.id) + '"', 'Принять', 'primary') + fbtn('decline', 'data-id="' + esc(f.id) + '"', 'Отклонить'));
+        h += frow(f, fbtn('accept', 'data-id="' + esc(f.id) + '"', 'Принять', 'primary') + fbtn('decline', 'data-id="' + esc(f.id) + '"', 'Отклонить'));
       });
       h += '</section>';
     }
     h += '<section class="fsec"><h3>Мои друзья' + (rel.friends.length ? ' · ' + rel.friends.length : '') + '</h3>';
     if (!rel.friends.length) h += '<p class="hint">Пока никого. Найди игрока по нику и отправь заявку.</p>';
     rel.friends.forEach(function (f) {
-      h += frow(f.nick,
+      h += frow(f,
         fbtn('view', 'data-uid="' + esc(f.uid) + '" data-nick="' + esc(f.nick) + '"', f.share ? 'Коллекция' : 'Закрыто', f.share ? '' : 'off') +
         fbtn('remove', 'data-id="' + esc(f.id) + '"', armedFriend === f.id ? 'Точно?' : 'Убрать', armedFriend === f.id ? 'danger armed' : 'danger'));
     });
     h += '</section>';
     if (rel.outgoing.length) {
       h += '<section class="fsec"><h3>Отправленные заявки</h3>';
-      rel.outgoing.forEach(function (f) { h += frow(f.nick, fbtn('cancel', 'data-id="' + esc(f.id) + '"', 'Отменить')); });
+      rel.outgoing.forEach(function (f) { h += frow(f, fbtn('cancel', 'data-id="' + esc(f.id) + '"', 'Отменить')); });
       h += '</section>';
     }
     $('#fr-body').innerHTML = h;
@@ -868,9 +894,9 @@
     var q = $('#fr-q').value.trim();
     if (q.length < 2) return showFrErr('Введи хотя бы 2 символа ника.');
     var pat = q.replace(/[\\%_]/g, function (c) { return '\\' + c; }) + '%';
-    var r = await sb.from('profiles').select('user_id,nick').ilike('nick', pat).neq('user_id', user.id).order('nick').limit(8);
+    var r = await sb.from('profiles').select('user_id,nick,avatar,bio,fav_game').ilike('nick', pat).neq('user_id', user.id).order('nick').limit(8);
     if (r.error) return showFrErr('Поиск не удался. Попробуй ещё раз.');
-    found = r.data; renderFriends();
+    found = r.data.map(function (p) { p.fav = p.fav_game || ''; return p; }); renderFriends();
   }
   async function friendAction(b) {
     var act = b.getAttribute('data-fa'), id = b.getAttribute('data-id');
@@ -897,7 +923,11 @@
 
   function setViewing() {
     $('#viewing').hidden = !viewing;
-    if (viewing) $('#v-nick').textContent = viewing.nick;
+    if (viewing) {
+      $('#v-nick').textContent = viewing.nick;
+      var vb = [viewing.bio, viewing.fav ? 'Любимая игра: ' + viewing.fav : ''].filter(Boolean).join(' · ');
+      $('#v-bio').textContent = vb; $('#v-bio').hidden = !vb;
+    }
     $('#add').hidden = !!viewing;
     $('#app').classList.toggle('ro', !!viewing);
     view = { tab: 'all', q: '', sort: 'updated' };
@@ -909,7 +939,7 @@
     var r = await sb.from('games').select('*').eq('user_id', uid).order('updated_at', { ascending: false }).limit(500);
     if (r.error) { toast('Не удалось загрузить коллекцию'); return; }
     if (!viewing) mine = games;
-    viewing = { id: uid, nick: nick };
+    viewing = { id: uid, nick: nick, avatar: f ? f.avatar : 0, bio: f ? f.bio : '', fav: f ? f.fav : '' };
     games = r.data.map(fromRow); loaded = true;
     $('#fr').hidden = true;
     setViewing(); render();
@@ -954,6 +984,24 @@
         er.hidden = false; return;
       }
       me.nick = r.data.nick; $('#acct-t').textContent = me.nick; toast('Ник изменён');
+    });
+    $('#acc-av').addEventListener('click', async function (e) {
+      var b = e.target.closest('[data-av]'); if (!b) return;
+      var v = Number(b.getAttribute('data-av')), old = me.avatar;
+      if (v === old) return;
+      me.avatar = v; drawAvPicker(); drawAvatar();
+      var r = await sb.from('profiles').update({ avatar: v }).eq('user_id', user.id);
+      if (r.error) { me.avatar = old; drawAvPicker(); drawAvatar(); toast('Не удалось сменить аватар'); } else toast('Аватар обновлён');
+    });
+    $('#prof-form').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      var bio = $('#acc-bio').value.trim().slice(0, 80), fav = $('#acc-fav').value.trim().slice(0, 40), er = $('#acc-prof-err');
+      er.hidden = true;
+      var b = $('#acc-prof-save'); b.disabled = true;
+      var r = await sb.from('profiles').update({ bio: bio, fav_game: fav }).eq('user_id', user.id);
+      b.disabled = false;
+      if (r.error) { er.textContent = 'Не удалось сохранить. Попробуй ещё раз.'; er.hidden = false; return; }
+      me.bio = bio; me.fav = fav; toast('Профиль сохранён');
     });
     $('#acc-share').addEventListener('change', async function (e) {
       var v = e.target.checked;

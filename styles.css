@@ -373,3 +373,15 @@ select.field {
 .an { font: 600 16px/1.2 var(--f-pixel); overflow-wrap: anywhere; }
 .ad { font-size: 12px; color: var(--dim); }
 @media (max-width: 760px) { .hdr-r { flex-wrap: wrap; } }
+
+/* Beta v2.1: аватары и профиль */
+.avs { display: block; }
+.av-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.av-b { background: var(--field); border: 3px solid var(--line); padding: 8px 0; display: grid; place-items: center; }
+.av-b[aria-pressed="true"] { background: var(--ink); box-shadow: 3px 3px 0 var(--accent); }
+.av-b[aria-pressed="true"] .avs { filter: brightness(1.15); }
+.fwho { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1 1 140px; }
+.fav { width: 36px; height: 36px; flex: none; border: 3px solid var(--line); background: var(--surface2); display: grid; place-items: center; }
+.fname { display: flex; flex-direction: column; min-width: 0; }
+.fsub { font-size: 12px; color: var(--dim); overflow-wrap: anywhere; }
+.avatar .avs { display: grid; place-items: center; }

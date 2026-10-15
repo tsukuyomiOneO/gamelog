@@ -32,7 +32,7 @@
     </div>
   </header>
 
-  <div class="panel viewing" id="viewing" hidden><span>Коллекция игрока <b id="v-nick"></b>. Только просмотр.</span><button class="btn s" id="v-back" type="button">← Моя коллекция</button></div>
+  <div class="panel viewing" id="viewing" hidden><span>Коллекция игрока <b id="v-nick"></b>. Только просмотр.<br><small class="hint" id="v-bio" hidden></small></span><button class="btn s" id="v-back" type="button">← Моя коллекция</button></div>
 
   <section class="panel hud" aria-label="Профиль игрока">
     <div class="player">
@@ -106,6 +106,13 @@
       <p class="hint">3–20 символов: буквы, цифры и _. Двух одинаковых ников не бывает, свой можно менять когда угодно.</p>
       <p class="err" id="acc-nick-err" hidden></p>
       <button class="btn" id="acc-nick-save" type="submit">Сменить ник</button>
+    </form>
+    <div class="lab"><span>Аватар</span><div class="av-grid" id="acc-av"></div></div>
+    <form id="prof-form" novalidate>
+      <label class="lab"><span>О себе</span><input class="field" id="acc-bio" maxlength="80" autocomplete="off" placeholder="Например, люблю метроидвании"></label>
+      <label class="lab"><span>Любимая игра</span><input class="field" id="acc-fav" maxlength="40" autocomplete="off" placeholder="Hollow Knight"></label>
+      <p class="err" id="acc-prof-err" hidden></p>
+      <button class="btn" id="acc-prof-save" type="submit">Сохранить профиль</button>
     </form>
     <label class="chk"><input type="checkbox" id="acc-share"><span>Друзья видят мою коллекцию</span></label>
     <div class="acct-row">
