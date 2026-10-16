@@ -1,9 +1,9 @@
 // Тема оформления и эффекты. Подключается в <head> до отрисовки, чтобы не было мигания.
-// По умолчанию «Аркада»; светлую и тёмную человек включает кнопкой в шапке.
+// По умолчанию тёмная; светлую человек включает кнопкой в шапке. Прежнее значение «arcade» считается тёмной.
 (function () {
-  var t = 'arcade', fx = 'on', d = document.documentElement;
+  var t = 'dark', fx = 'on', d = document.documentElement;
   try {
-    var s = localStorage.getItem('gamelog.skin'); if (s === 'arcade' || s === 'dark' || s === 'light') t = s;
+    var s = localStorage.getItem('gamelog.skin'); if (s === 'light') t = 'light';
     if (localStorage.getItem('gamelog.fx') === 'off') fx = 'off';
   } catch (e) {}
   d.setAttribute('data-theme', t);

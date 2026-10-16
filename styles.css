@@ -400,7 +400,7 @@ select.field {
 .cmp-t td.w { font-weight: 700; color: var(--done); }
 .cmp-l { margin: 0; font-size: 13px; color: var(--dim); overflow-wrap: anywhere; }
 
-/* ===== Beta v2.3: тема «Аркада» (игровые автоматы США, 2000-е) ===== */
+/* ===== Beta v2.4: стиль игровых автоматов США 2000-х для светлой и тёмной тем ===== */
 .coin { display: none; }
 .lvlup { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; background: rgba(8, 1, 5, 0.6); cursor: pointer; animation: luback 2.6s steps(1) forwards; }
 .lu-in { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 26px 34px; background: var(--surface); border: 4px solid var(--star); color: var(--star); font-family: 'Bungee', var(--f-display); text-align: center; box-shadow: 0 0 0 3px #000, 0 0 40px var(--star); animation: lupop 0.5s ease-out, lublink 0.4s steps(1) 0.5s 5; }
@@ -412,67 +412,91 @@ select.field {
 .toast.ach { background: linear-gradient(#ffe27a, #e0a512); color: #2a1500; border-color: #fff3d6; box-shadow: 0 0 0 3px #000, 0 0 26px rgba(255, 210, 63, 0.8); animation: achin 0.6s cubic-bezier(.2, 1.6, .4, 1); }
 @keyframes achin { from { transform: translateX(-50%) translateY(60px) scale(0.6); opacity: 0; } to { transform: translateX(-50%); opacity: 1; } }
 
-:root[data-theme="arcade"] {
+:root[data-theme="dark"] {
   --bg: #14050c; --grid: #200a16; --surface: #2b0c19; --surface2: #431228; --field: #18060f;
   --ink: #fff3d6; --dim: #e0b88a; --line: #e8b930; --shadow: #000; --faint: #6d3a2a;
   --accent: #ff3355; --on-accent: #fff; --star: #ffd23f; --play: #4db3ff; --done: #3ee27c;
-  --queue: #c98bff; --wish: #ffb02e; --drop: #ff6b6b; --scrim: rgba(8, 1, 5, 0.8); --bulb: #ffd23f;
+  --queue: #c98bff; --wish: #ffb02e; --drop: #ff6b6b; --scrim: rgba(8, 1, 5, 0.8); --bulb: #ffd23f; --bulb2: #8a5200;
   color-scheme: dark;
 }
-:root[data-theme="arcade"] body {
+:root body {
   background-image: radial-gradient(ellipse at 50% -10%, rgba(255, 51, 85, 0.3), transparent 60%), linear-gradient(var(--grid) 2px, transparent 2px), linear-gradient(90deg, var(--grid) 2px, transparent 2px);
   background-size: auto, 24px 24px, 24px 24px;
   background-attachment: fixed, scroll, scroll;
 }
-:root[data-theme="arcade"] body::before { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 59; box-shadow: inset 0 0 140px rgba(0, 0, 0, 0.7); }
-:root[data-theme="arcade"] body::after { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 60; background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.22) 0 1px, transparent 1px 3px); opacity: 0.3; }
-:root[data-theme="arcade"] .panel {
+:root body::before { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 59; box-shadow: inset 0 0 140px rgba(0, 0, 0, 0.7); }
+:root body::after { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 60; background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.22) 0 1px, transparent 1px 3px); opacity: 0.3; }
+:root .panel {
   background: linear-gradient(180deg, var(--surface2), var(--surface) 45%);
   box-shadow: 0 0 0 2px #000, 5px 5px 0 #000, 0 0 22px rgba(255, 200, 40, 0.16);
 }
-:root[data-theme="arcade"] .hud,
-:root[data-theme="arcade"] .modal { outline: 5px dotted var(--bulb); outline-offset: 5px; animation: bulbs 1.2s steps(1) infinite; }
-@keyframes bulbs { 0% { outline-color: #ffd23f; } 50% { outline-color: #8a5200; } }
-:root[data-theme="arcade"] .brand h1, :root[data-theme="arcade"] .mh h2, :root[data-theme="arcade"] .a-brand, :root[data-theme="arcade"] .empty h2 { font-family: 'Bungee', var(--f-display); letter-spacing: 2px; }
-:root[data-theme="arcade"] .brand h1 {
+:root .hud,
+:root .modal { outline: 5px dotted var(--bulb); outline-offset: 5px; animation: bulbs 1.2s steps(1) infinite; }
+@keyframes bulbs { 0% { outline-color: var(--bulb); } 50% { outline-color: var(--bulb2); } }
+:root .brand h1, :root .mh h2, :root .a-brand, :root .empty h2 { font-family: 'Bungee', var(--f-display); letter-spacing: 2px; }
+:root .brand h1 {
   color: #fff3d6; font-size: clamp(18px, 5vw, 28px);
   text-shadow: 0 0 4px #fff, 0 0 10px #ff3355, 0 0 22px #ff3355, 0 0 42px #ff3355;
   animation: flick 7s steps(1) infinite;
 }
 @keyframes flick { 0%, 17%, 21%, 61%, 64%, 100% { opacity: 1; } 19%, 62% { opacity: 0.5; } }
-:root[data-theme="arcade"] .mh h2 { color: var(--star); text-shadow: 0 0 10px rgba(255, 210, 63, 0.7); }
-:root[data-theme="arcade"] .ver { color: var(--star); text-shadow: 0 0 8px var(--star); animation: pulse 1.6s steps(2) infinite; }
+:root .mh h2 { color: var(--star); text-shadow: 0 0 10px rgba(255, 210, 63, 0.7); }
+:root .ver { color: var(--star); text-shadow: 0 0 8px var(--star); animation: pulse 1.6s steps(2) infinite; }
 @keyframes pulse { 50% { opacity: 0.55; } }
-:root[data-theme="arcade"] .lvl { color: var(--star); text-shadow: 0 0 8px var(--star); }
-:root[data-theme="arcade"] .rank { font-family: 'Bungee', var(--f-pixel); color: var(--ink); }
-:root[data-theme="arcade"] .stat dd { color: var(--star); text-shadow: 0 0 8px rgba(255, 210, 63, 0.6); background: #000; padding: 6px 8px; border: 2px solid var(--faint); text-align: center; letter-spacing: 1px; }
-:root[data-theme="arcade"] .segbar i.on { box-shadow: 0 0 6px var(--c, var(--accent)); animation: seg 1.8s steps(2) infinite; }
+:root .lvl { color: var(--star); text-shadow: 0 0 8px var(--star); }
+:root .rank { font-family: 'Bungee', var(--f-pixel); color: var(--ink); }
+:root .stat dd { color: var(--star); text-shadow: 0 0 8px rgba(255, 210, 63, 0.6); background: #000; padding: 6px 8px; border: 2px solid var(--faint); text-align: center; letter-spacing: 1px; }
+:root .segbar i.on { box-shadow: 0 0 6px var(--c, var(--accent)); animation: seg 1.8s steps(2) infinite; }
 @keyframes seg { 50% { filter: brightness(1.35); } }
-:root[data-theme="arcade"] .btn { background: linear-gradient(#5a1a35, #34101f); color: var(--ink); box-shadow: 0 4px 0 #000, 0 0 0 2px #000; }
-:root[data-theme="arcade"] .btn:active { transform: translateY(4px); box-shadow: 0 0 0 2px #000; }
-:root[data-theme="arcade"] .btn.primary { background: linear-gradient(#ff6a82, #d1002f); color: #fff; text-shadow: 0 1px 0 #6d0017; box-shadow: 0 4px 0 #6d0017, 0 0 0 2px #000, 0 0 14px rgba(255, 51, 85, 0.5); }
-:root[data-theme="arcade"] .btn.danger { color: var(--drop); }
-:root[data-theme="arcade"] .chip { background: linear-gradient(#431228, #2b0c19); }
-:root[data-theme="arcade"] .tab[aria-pressed="true"] { background: linear-gradient(#ffe27a, #e0a512); color: #2a1500; box-shadow: 0 0 12px rgba(255, 210, 63, 0.6), 3px 3px 0 #000; }
-:root[data-theme="arcade"] .tab[aria-pressed="true"] .n { color: #2a1500; }
-:root[data-theme="arcade"] .card.beaten { border-color: var(--star); box-shadow: 0 0 0 2px #000, 5px 5px 0 #000, 0 0 20px rgba(255, 210, 63, 0.4); position: relative; overflow: hidden; }
-:root[data-theme="arcade"] .card.beaten::after { content: ''; position: absolute; top: 0; bottom: 0; left: -40%; width: 30%; background: linear-gradient(100deg, transparent, rgba(255, 243, 214, 0.28), transparent); transform: skewX(-18deg); animation: shine 4.5s ease-in-out infinite; pointer-events: none; }
+:root .btn { background: linear-gradient(#5a1a35, #34101f); color: var(--ink); box-shadow: 0 4px 0 #000, 0 0 0 2px #000; }
+:root .btn:active { transform: translateY(4px); box-shadow: 0 0 0 2px #000; }
+:root .btn.primary { background: linear-gradient(#ff6a82, #d1002f); color: #fff; text-shadow: 0 1px 0 #6d0017; box-shadow: 0 4px 0 #6d0017, 0 0 0 2px #000, 0 0 14px rgba(255, 51, 85, 0.5); }
+:root .btn.danger { color: var(--drop); }
+:root .chip { background: linear-gradient(#431228, #2b0c19); }
+:root .tab[aria-pressed="true"] { background: linear-gradient(#ffe27a, #e0a512); color: #2a1500; box-shadow: 0 0 12px rgba(255, 210, 63, 0.6), 3px 3px 0 #000; }
+:root .tab[aria-pressed="true"] .n { color: #2a1500; }
+:root .card.beaten { border-color: var(--star); box-shadow: 0 0 0 2px #000, 5px 5px 0 #000, 0 0 20px rgba(255, 210, 63, 0.4); position: relative; overflow: hidden; }
+:root .card.beaten::after { content: ''; position: absolute; top: 0; bottom: 0; left: -40%; width: 30%; background: linear-gradient(100deg, transparent, rgba(255, 243, 214, 0.28), transparent); transform: skewX(-18deg); animation: shine 4.5s ease-in-out infinite; pointer-events: none; }
 @keyframes shine { 0%, 55% { left: -40%; } 100% { left: 130%; } }
-:root[data-theme="arcade"] .coin { display: block; font: 400 clamp(16px, 4.6vw, 26px)/1.2 'Bungee', var(--f-display); color: var(--star); text-shadow: 0 0 10px var(--star), 0 0 24px var(--accent); letter-spacing: 3px; }
-:root[data-theme="arcade"] .frow.top { border-color: var(--star); box-shadow: 0 0 16px rgba(255, 210, 63, 0.45); animation: pulse 1.6s steps(2) infinite; }
-:root[data-theme="arcade"] .crown { color: var(--star); display: inline-block; }
-:root[data-theme="arcade"] .rxb[aria-pressed="true"] { background: linear-gradient(#ffe27a, #e0a512); color: #2a1500; box-shadow: 0 0 10px rgba(255, 210, 63, 0.6); }
-:root[data-theme="arcade"] .ach:not(.lock) { border-color: var(--star); box-shadow: 0 0 12px rgba(255, 210, 63, 0.3); }
-:root[data-theme="arcade"] .ach:not(.lock) .ai { filter: drop-shadow(0 0 5px var(--star)); }
-:root[data-theme="arcade"] .stat dt, :root[data-theme="arcade"] .xp-label { color: var(--dim); }
-:root[data-theme="arcade"] select.field {
+:root .coin { display: block; font: 400 clamp(16px, 4.6vw, 26px)/1.2 'Bungee', var(--f-display); color: var(--star); text-shadow: 0 0 10px var(--star), 0 0 24px var(--accent); letter-spacing: 3px; }
+:root .frow.top { border-color: var(--star); box-shadow: 0 0 16px rgba(255, 210, 63, 0.45); animation: pulse 1.6s steps(2) infinite; }
+:root .crown { color: var(--star); display: inline-block; }
+:root .rxb[aria-pressed="true"] { background: linear-gradient(#ffe27a, #e0a512); color: #2a1500; box-shadow: 0 0 10px rgba(255, 210, 63, 0.6); }
+:root .ach:not(.lock) { border-color: var(--star); box-shadow: 0 0 12px rgba(255, 210, 63, 0.3); }
+:root .ach:not(.lock) .ai { filter: drop-shadow(0 0 5px var(--star)); }
+:root .stat dt, :root .xp-label { color: var(--dim); }
+:root[data-theme="dark"] select.field {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 5' shape-rendering='crispEdges'%3E%3Cpath fill='%23fff3d6' d='M0 0h2v1h1v1h2V1h1V0h2v1H7v1H6v1H5v1H3V3H2V2H1V1H0z'/%3E%3C/svg%3E");
 }
 /* Выключатель эффектов и «уменьшить движение» */
 html[data-fx="off"] *, html[data-fx="off"] *::before, html[data-fx="off"] *::after { animation: none !important; transition: none !important; }
-html[data-fx="off"][data-theme="arcade"] body::after { display: none; }
-@media (prefers-reduced-motion: reduce) { :root[data-theme="arcade"] *, :root[data-theme="arcade"] *::before, :root[data-theme="arcade"] *::after { animation: none !important; } }
+html[data-fx="off"] body::after { display: none; }
+@media (prefers-reduced-motion: reduce) { :root *, :root *::before, :root *::after { animation: none !important; } }
 @media (max-width: 760px) {
-  :root[data-theme="arcade"] .hud, :root[data-theme="arcade"] .modal { outline-width: 4px; outline-offset: 4px; }
-  :root[data-theme="arcade"] .stat dd { font-size: 14px; padding: 4px 4px; }
+  :root .hud, :root .modal { outline-width: 4px; outline-offset: 4px; }
+  :root .stat dd { font-size: 14px; padding: 4px 4px; }
 }
+
+/* Светлая тема: «дневной» автомат, кремовый корпус, красный и золото */
+:root[data-theme="light"] {
+  --bg: #ffe9b0; --grid: #f6d98f; --surface: #fff6dc; --surface2: #ffe29a; --field: #fffdf3;
+  --ink: #2b0c19; --dim: #7a4a3a; --line: #7a0f2a; --shadow: #2b0c19; --faint: #d9b36a;
+  --accent: #e0112f; --on-accent: #fff; --star: #d98a00; --play: #1d5fc4; --done: #1f8f3f;
+  --queue: #7b3fb8; --wish: #c47a00; --drop: #c62828; --scrim: rgba(43, 12, 25, 0.6);
+  --bulb: #e0112f; --bulb2: #f3b23a;
+}
+:root[data-theme="light"] body { background-image: radial-gradient(ellipse at 50% -10%, rgba(224, 17, 47, 0.16), transparent 60%), linear-gradient(var(--grid) 2px, transparent 2px), linear-gradient(90deg, var(--grid) 2px, transparent 2px); }
+:root[data-theme="light"] body::before { box-shadow: inset 0 0 120px rgba(122, 15, 42, 0.28); }
+:root[data-theme="light"] body::after { opacity: 0.1; }
+:root[data-theme="light"] .panel { box-shadow: 0 0 0 2px var(--shadow), 5px 5px 0 var(--shadow), 0 0 18px rgba(217, 138, 0, 0.18); }
+:root[data-theme="light"] .brand h1 { color: var(--accent); text-shadow: 0 2px 0 #7a0f2a, 0 0 12px rgba(224, 17, 47, 0.35); }
+:root[data-theme="light"] .mh h2, :root[data-theme="light"] .ver, :root[data-theme="light"] .lvl { color: var(--accent); text-shadow: none; }
+:root[data-theme="light"] .coin { color: var(--accent); text-shadow: 0 2px 0 rgba(122, 15, 42, 0.4); }
+:root[data-theme="light"] .btn { background: linear-gradient(#fffaf0, #ffd98a); color: var(--ink); box-shadow: 0 4px 0 var(--shadow), 0 0 0 2px var(--shadow); }
+:root[data-theme="light"] .btn:active { box-shadow: 0 0 0 2px var(--shadow); }
+:root[data-theme="light"] .btn.primary { background: linear-gradient(#ff6a82, #d1002f); color: #fff; box-shadow: 0 4px 0 #6d0017, 0 0 0 2px var(--shadow); }
+:root[data-theme="light"] .chip { background: linear-gradient(#fffaf0, #ffe29a); }
+:root[data-theme="light"] .lu-in b { text-shadow: 0 2px 0 #7a0f2a; }
+:root[data-theme="light"] .lu-in { color: var(--accent); border-color: var(--accent); box-shadow: 0 0 0 3px var(--shadow), 0 0 30px var(--star); }
+:root[data-theme="light"] .frow.top { box-shadow: 0 0 14px rgba(217, 138, 0, 0.5); }
+:root[data-theme="light"] .crown { color: var(--star); }

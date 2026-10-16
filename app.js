@@ -229,7 +229,7 @@
   var reduceMotion = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
   function fxOn() {
     var d = document.documentElement;
-    return !reduceMotion && d.getAttribute('data-fx') !== 'off' && d.getAttribute('data-theme') === 'arcade';
+    return !reduceMotion && d.getAttribute('data-fx') !== 'off';
   }
   function setNum(el, text, delay) {
     if (el._t === text) return;
@@ -460,12 +460,12 @@
     if (persist) { try { localStorage.setItem('gamelog.skin', t); } catch (e) {} }
     var b = $('#theme');
     if (b) {
-      b.innerHTML = pix(t === 'dark' ? MOON : t === 'arcade' ? STAR : SUN, 20);
-      var label = 'Тема: ' + (t === 'dark' ? 'тёмная' : t === 'arcade' ? 'аркада' : 'светлая') + '. Переключить';
+      b.innerHTML = pix(t === 'dark' ? MOON : SUN, 20);
+      var label = 'Тема: ' + (t === 'dark' ? 'тёмная' : 'светлая') + '. Переключить';
       b.setAttribute('aria-label', label); b.title = label;
     }
     var m = document.querySelector('meta[name="theme-color"]');
-    if (m) m.setAttribute('content', t === 'dark' ? '#15122e' : t === 'arcade' ? '#14050c' : '#cdd6ad');
+    if (m) m.setAttribute('content', t === 'dark' ? '#14050c' : '#ffe9b0');
   }
 
   async function submitAuth(e) {
@@ -604,7 +604,7 @@
     $('#acct').addEventListener('click', openAccount);
     $('#theme').addEventListener('click', function () {
       var cur = document.documentElement.getAttribute('data-theme');
-      applyTheme(cur === 'arcade' ? 'light' : cur === 'light' ? 'dark' : 'arcade', true);
+      applyTheme(cur === 'dark' ? 'light' : 'dark', true);
     });
     $('#a-resend').addEventListener('click', async function () {
       var email = $('#a-email').value.trim();
@@ -722,7 +722,7 @@
   }
 
   /* ---------- Beta v2.0: ники, друзья, достижения ---------- */
-  var VERSION = 'Beta v2.3';
+  var VERSION = 'Beta v2.4';
   var NICK_RE = /^[A-Za-z0-9_А-Яа-яЁё]{3,20}$/;
   var me = { nick: '', share: true, avatar: 0, bio: '', fav: '' };
   var rel = { friends: [], incoming: [], outgoing: [] };
@@ -1201,7 +1201,7 @@
     $('#logo').innerHTML = '<div style="color:var(--accent)">' + pix(HEART, 40) + '</div>';
     $('#a-logo').innerHTML = '<span style="color:var(--accent)">' + pix(HEART, 28) + '</span>';
     $('#avatar').innerHTML = '<div style="color:var(--accent)">' + pix(HEART, 40) + '</div>';
-    applyTheme(document.documentElement.getAttribute('data-theme') || 'arcade', false);
+    applyTheme(document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark', false);
     if (cfg.APP_ENV && cfg.APP_ENV !== 'production') {
       $('#env').hidden = false;
       document.title = '[ТЕСТ] ' + document.title;
