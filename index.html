@@ -32,7 +32,7 @@
     </div>
   </header>
 
-  <div class="panel viewing" id="viewing" hidden><span>Коллекция игрока <b id="v-nick"></b>. Только просмотр.<br><small class="hint" id="v-bio" hidden></small></span><button class="btn s" id="v-back" type="button">← Моя коллекция</button></div>
+  <div class="panel viewing" id="viewing" hidden><span>Коллекция игрока <b id="v-nick"></b>. Только просмотр.<br><small class="hint" id="v-bio" hidden></small></span><span class="fbtns"><button class="btn s" id="v-cmp" type="button">Сравнить</button><button class="btn s" id="v-back" type="button">← Моя коллекция</button></span></div>
 
   <section class="panel hud" aria-label="Профиль игрока">
     <div class="player">
@@ -150,6 +150,34 @@
     </div>
     <p class="hint" id="aw-sub"></p>
     <div class="ach-grid" id="aw-grid"></div>
+  </div>
+</div>
+
+<!-- Совет другу -->
+<div class="overlay" id="rec" hidden>
+  <div class="panel modal" role="dialog" aria-modal="true" aria-labelledby="rec-t">
+    <div class="mh">
+      <h2 id="rec-t">Посоветовать</h2>
+      <button class="x" id="rec-close" type="button" aria-label="Закрыть">×</button>
+    </div>
+    <p class="hint">Игра: <b id="rec-game"></b></p>
+    <form id="rec-form" novalidate>
+      <label class="lab"><span>Кому</span><select class="field" id="rec-to"></select></label>
+      <label class="lab"><span>Сообщение (необязательно)</span><input class="field" id="rec-msg" maxlength="80" autocomplete="off" placeholder="Тебе точно зайдёт"></label>
+      <p class="err" id="rec-err" role="alert" hidden></p>
+      <button class="btn primary" id="rec-send" type="submit">Отправить</button>
+    </form>
+  </div>
+</div>
+
+<!-- Сравнение -->
+<div class="overlay" id="cmp" hidden>
+  <div class="panel modal" role="dialog" aria-modal="true" aria-labelledby="cmp-t">
+    <div class="mh">
+      <h2 id="cmp-t">Сравнение</h2>
+      <button class="x" id="cmp-close" type="button" aria-label="Закрыть">×</button>
+    </div>
+    <div id="cmp-body"></div>
   </div>
 </div>
 

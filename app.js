@@ -249,6 +249,20 @@
     });
     $('#tabs').innerHTML = html;
   }
+  function cardExtra(g, ro) {
+    var K = [['fire', 'Огонь'], ['want', 'Тоже хочу'], ['hurry', 'Пройди!']];
+    var c = rx.cnt[g.id] || {}, h = '<div class="cact">';
+    if (ro) {
+      K.forEach(function (k) {
+        h += '<button class="rxb" type="button" data-act="rx" data-id="' + esc(g.id) + '" data-k="' + k[0] + '" aria-pressed="' + !!rx.mine[g.id + ':' + k[0]] + '">' + k[1] + '</button>';
+      });
+      h += '<button class="rxb add" type="button" data-act="wishadd" data-id="' + esc(g.id) + '">В «Хочу»</button>';
+    } else {
+      K.forEach(function (k) { if (c[k[0]]) h += '<span class="rxc">' + k[1] + ' ' + c[k[0]] + '</span>'; });
+      h += '<button class="rxb" type="button" data-act="rec" data-id="' + esc(g.id) + '">Посоветовать</button>';
+    }
+    return h + '</div>';
+  }
   function card(g) {
     var st = STATUS[g.status] || STATUS.queue;
     var segs = Math.round((g.status === 'beaten' ? 100 : (g.progress || 0)) / 10);
@@ -265,6 +279,7 @@
     if (g.notes) h += '<p class="note">' + esc(g.notes) + '</p>';
     h += '<div class="foot">' + (g.rating > 0 ? stars(g.rating, 14) : '<span class="meta">Без оценки</span>');
     h += '<span class="hours">' + (g.status === 'playing' && !ro ? '<button class="plus" type="button" data-act="plus" data-id="' + esc(g.id) + '" aria-label="Добавить час к «' + esc(g.title) + '»">+1 Ч</button>' : '') + fmt(g.hours) + ' Ч</span></div>';
+    h += cardExtra(g, ro);
     return h + '</div></article>';
   }
   function renderGrid() {
@@ -518,7 +533,8 @@
     if (!u) {
       games = []; loaded = false;
       viewing = null; mine = null; socialLoaded = false; rel = { friends: [], incoming: [], outgoing: [] }; me = { nick: '', share: true, avatar: 0, bio: '', fav: '' };
-      setViewing(); $('#fr').hidden = true; $('#aw').hidden = true;
+      recs = []; board = null; rx = { cnt: {}, mine: {} };
+      setViewing(); $('#fr').hidden = true; $('#aw').hidden = true; $('#rec').hidden = true; $('#cmp').hidden = true;
       $('#app').hidden = true; $('#acc').hidden = true; $('#ov').hidden = true;
       showAuth('in');
       if (linkNote) { authMsg(linkNote.kind, linkNote.text); $('#a-resend').hidden = !linkNote.resend; linkNote = null; }
@@ -529,7 +545,7 @@
     if (linkWelcome) { linkWelcome = false; toast('Почта подтверждена. Добро пожаловать!'); }
     $('#acct-t').textContent = u.email || 'Аккаунт';
     loaded = false; render();
-    loadGames(); loadProfile(); loadSocial();
+    loadGames(); loadProfile(); loadSocial(); loadReactions();
   }
 
   /* ---------- примеры ---------- */
@@ -583,6 +599,9 @@
       if (act === 'edit') openModal(id);
       if (act === 'new') openModal(null);
       if (act === 'demo') addExamples();
+      if (act === 'rx') toggleRx(id, b.getAttribute('data-k'));
+      if (act === 'rec') openRec(id);
+      if (act === 'wishadd') wishAdd(id);
       if (act === 'plus') {
         var g = games.find(function (x) { return x.id === id; });
         if (g) { var n = Object.assign({}, g); n.hours = Math.round(((Number(g.hours) || 0) + 1) * 10) / 10; saveGame(n, null, false); }
@@ -597,6 +616,7 @@
     document.addEventListener('keydown', function (e) {
       if (e.key !== 'Escape') return;
       if (!$('#ov').hidden) closeModal(); else if (!$('#acc').hidden) $('#acc').hidden = true;
+      else if (!$('#rec').hidden) $('#rec').hidden = true; else if (!$('#cmp').hidden) $('#cmp').hidden = true;
       else if (!$('#fr').hidden) $('#fr').hidden = true; else if (!$('#aw').hidden) $('#aw').hidden = true;
     });
     $('#f-status').addEventListener('click', function (e) {
@@ -678,7 +698,7 @@
   }
 
   /* ---------- Beta v2.0: ники, друзья, достижения ---------- */
-  var VERSION = 'Beta v2.1';
+  var VERSION = 'Beta v2.2';
   var NICK_RE = /^[A-Za-z0-9_А-Яа-яЁё]{3,20}$/;
   var me = { nick: '', share: true, avatar: 0, bio: '', fav: '' };
   var rel = { friends: [], incoming: [], outgoing: [] };
@@ -686,6 +706,7 @@
   var found = null;
   var viewing = null, mine = null;
   var armedFriend = null;
+  var recs = [], board = null, rx = { cnt: {}, mine: {} }, recGame = null;
 
   var TROPHY = ['XXXXXXXXX', 'X.XXXXX.X', 'X.XXXXX.X', '.XXXXXXX.', '..XXXXX..', '...XXX...', '...XXX...', '..XXXXX..', '.XXXXXXX.'];
   var CROWN = ['X...X...X', 'XX..X..XX', 'XXX.X.XXX', 'XXXXXXXXX', 'XXXXXXXXX', 'XXXXXXXXX'];
@@ -810,13 +831,18 @@
       if (f.status === 'accepted') next.friends.push(it); else if (out) next.outgoing.push(it); else next.incoming.push(it);
     });
     next.friends.sort(function (a, b) { return a.nick.localeCompare(b.nick, 'ru'); });
+    var rr = await sb.from('recommendations').select('id,from_user,title,platform,genre,msg').eq('to_user', user.id).eq('status', 'new').order('created_at', { ascending: false }).limit(20);
+    recs = rr.error ? [] : rr.data.map(function (x) {
+      var f = pr[x.from_user] || {};
+      return { id: x.id, title: x.title, platform: x.platform, genre: x.genre, msg: x.msg, nick: f.nick || '?', avatar: Number(f.avatar) || 0 };
+    });
     rel = next; socialLoaded = true;
     updateBadge(); checkAch();
     if (!$('#fr').hidden) renderFriends();
   }
   function updateBadge() {
     var b = $('#fr-badge'); if (!b) return;
-    var n = rel.incoming.length; b.hidden = !n; b.textContent = n > 9 ? '9+' : String(n);
+    var n = rel.incoming.length + recs.length; b.hidden = !n; b.textContent = n > 9 ? '9+' : String(n);
   }
   function relOf(uid) {
     if (rel.friends.some(function (x) { return x.uid === uid; })) return 'friend';
@@ -856,6 +882,14 @@
       });
       h += '</section>';
     }
+    if (recs.length) {
+      h += '<section class="fsec"><h3>Советы от друзей</h3>';
+      recs.forEach(function (x) {
+        h += '<div class="frow"><span class="fwho"><span class="fav">' + avHtml(x.avatar, 24) + '</span><span class="fname"><span class="fnick">' + esc(x.title) + '</span><span class="fsub">' + esc(x.nick) + (x.msg ? ': ' + esc(x.msg) : '') + '</span></span></span><span class="fbtns">' +
+          fbtn('recadd', 'data-id="' + esc(x.id) + '"', 'В «Хочу»', 'primary') + fbtn('rechide', 'data-id="' + esc(x.id) + '"', 'Скрыть') + '</span></div>';
+      });
+      h += '</section>';
+    }
     h += '<section class="fsec"><h3>Мои друзья' + (rel.friends.length ? ' · ' + rel.friends.length : '') + '</h3>';
     if (!rel.friends.length) h += '<p class="hint">Пока никого. Найди игрока по нику и отправь заявку.</p>';
     rel.friends.forEach(function (f) {
@@ -867,6 +901,14 @@
     if (rel.outgoing.length) {
       h += '<section class="fsec"><h3>Отправленные заявки</h3>';
       rel.outgoing.forEach(function (f) { h += frow(f, fbtn('cancel', 'data-id="' + esc(f.id) + '"', 'Отменить')); });
+      h += '</section>';
+    }
+    if (board && board.length > 1) {
+      h += '<section class="fsec"><h3>Лидеры среди друзей</h3>';
+      board.forEach(function (x, i) {
+        var sub = x.share || x.me ? 'LVL ' + x.lvl + ' · ' + x.hours + ' ч · пройдено ' + x.beaten : 'Коллекция закрыта';
+        h += '<div class="frow' + (x.me ? ' me' : '') + '"><span class="fwho"><span class="rk">#' + (i + 1) + '</span><span class="fav">' + avHtml(x.avatar, 24) + '</span><span class="fname"><span class="fnick">' + esc(x.nick) + (x.me ? ' (ты)' : '') + '</span><span class="fsub">' + esc(sub) + '</span></span></span><span class="hint">' + (x.share || x.me ? x.xp + ' XP' : '—') + '</span></div>';
+      });
       h += '</section>';
     }
     $('#fr-body').innerHTML = h;
@@ -887,7 +929,7 @@
     $('#fr-q').value = ''; $('#fr-err').hidden = true;
     renderFriends();
     $('#fr').hidden = false;
-    loadSocial();
+    loadSocial(); loadBoard();
   }
   async function searchFriends(e) {
     e.preventDefault(); $('#fr-err').hidden = true;
@@ -909,6 +951,15 @@
         var r = await sb.rpc('friend_request', { p_nick: b.getAttribute('data-nick') });
         if (r.error) throw r.error;
         toast(r.data === 'accepted' ? 'Вы теперь друзья' : 'Заявка отправлена');
+      } else if (act === 'recadd' || act === 'rechide') {
+        var rc = recs.filter(function (q) { return q.id === id; })[0];
+        if (act === 'recadd' && rc) {
+          if (viewing) leaveView();
+          saveGame({ id: uuid(), title: rc.title, platform: rc.platform, genre: rc.genre, status: 'wish', progress: 0, hours: 0, rating: 0, notes: '', cover: '', cover_path: null }, null, false);
+          toast('Добавлено в «Хочу»');
+        }
+        var r4 = await sb.from('recommendations').update({ status: act === 'recadd' ? 'added' : 'hidden' }).eq('id', id);
+        if (r4.error) throw r4.error;
       } else if (act === 'accept' || act === 'decline') {
         var r2 = await sb.rpc('friend_respond', { p_id: id, p_accept: act === 'accept' });
         if (r2.error) throw r2.error;
@@ -919,6 +970,98 @@
       }
     } catch (err) { showFrErr(friendErr(err)); }
     await loadSocial();
+  }
+
+  async function loadReactions() {
+    var r = await sb.from('reactions').select('game_id,kind,user_id').limit(5000);
+    if (r.error) return;
+    var cnt = {}, m = {};
+    r.data.forEach(function (x) {
+      if (x.user_id === user.id) m[x.game_id + ':' + x.kind] = 1;
+      else { var o = cnt[x.game_id] = cnt[x.game_id] || {}; o[x.kind] = (o[x.kind] || 0) + 1; }
+    });
+    rx = { cnt: cnt, mine: m };
+    renderGrid();
+  }
+  async function toggleRx(id, k) {
+    var key = id + ':' + k, on = !!rx.mine[key];
+    if (on) delete rx.mine[key]; else rx.mine[key] = 1;
+    renderGrid();
+    var r = on ? await sb.from('reactions').delete().eq('game_id', id).eq('user_id', user.id).eq('kind', k)
+               : await sb.from('reactions').insert({ game_id: id, user_id: user.id, kind: k });
+    if (r.error) { if (on) rx.mine[key] = 1; else delete rx.mine[key]; renderGrid(); toast('Не удалось. Попробуй ещё раз.'); }
+  }
+  async function wishAdd(id) {
+    var g = games.filter(function (x) { return x.id === id; })[0]; if (!g) return;
+    var t = g.title.trim().toLowerCase();
+    if ((mine || []).some(function (x) { return x.title.trim().toLowerCase() === t; })) return toast('Эта игра уже есть у тебя');
+    var n = { id: uuid(), title: g.title, platform: g.platform, genre: g.genre, status: 'wish', progress: 0, hours: 0, rating: 0, notes: '', cover: '', cover_path: null };
+    var r = await sb.from('games').insert(toRow(n, null));
+    if (r.error) return toast(errText(r.error));
+    n.updated = n.added = Date.now(); (mine = mine || []).push(n);
+    toast('Добавлено в «Хочу»');
+  }
+  function openRec(id) {
+    var g = games.filter(function (x) { return x.id === id; })[0]; if (!g) return;
+    if (!rel.friends.length) return toast('Сначала добавь друзей');
+    recGame = g;
+    $('#rec-game').textContent = g.title;
+    $('#rec-to').innerHTML = rel.friends.map(function (f) { return '<option value="' + esc(f.uid) + '">' + esc(f.nick) + '</option>'; }).join('');
+    $('#rec-msg').value = ''; $('#rec-err').hidden = true; $('#rec').hidden = false;
+  }
+  async function sendRec(e) {
+    e.preventDefault();
+    var er = $('#rec-err'), b = $('#rec-send'); er.hidden = true;
+    if (!recGame) return;
+    b.disabled = true;
+    var r = await sb.rpc('recommend_game', { p_to: $('#rec-to').value, p_title: recGame.title, p_platform: recGame.platform || '', p_genre: recGame.genre || '', p_msg: $('#rec-msg').value.trim().slice(0, 80) });
+    b.disabled = false;
+    if (r.error) { er.textContent = /rec_limit/.test(r.error.message || '') ? 'Сегодня уже много советов этому другу. Попробуй завтра.' : 'Не удалось отправить. Попробуй ещё раз.'; er.hidden = false; return; }
+    $('#rec').hidden = true; toast('Совет отправлен');
+  }
+  async function loadBoard() {
+    var r = await sb.rpc('friends_board');
+    if (r.error || !user) return;
+    board = r.data.map(function (x) {
+      var hrs = Number(x.hours) || 0, xp = x.beaten * 120 + Math.round(hrs) * 3 + x.playing * 15;
+      return { uid: x.user_id, nick: x.nick, avatar: Number(x.avatar) || 0, share: x.share, hours: Math.round(hrs * 10) / 10, beaten: x.beaten, xp: xp, lvl: 1 + Math.floor(Math.sqrt(xp / 60)), me: x.user_id === user.id };
+    }).sort(function (a, b) { return b.xp - a.xp; });
+    if (!$('#fr').hidden) renderFriends();
+  }
+  function cmpRow(label, a, b) {
+    return '<tr><td>' + label + '</td><td' + (a > b ? ' class="w"' : '') + '>' + a + '</td><td' + (b > a ? ' class="w"' : '') + '>' + b + '</td></tr>';
+  }
+  function cmpList(title, items) {
+    if (!items.length) return '';
+    return '<section class="fsec"><h3>' + title + ' · ' + items.length + '</h3><p class="cmp-l">' + items.slice(0, 15).map(esc).join(', ') + (items.length > 15 ? ' и ещё ' + (items.length - 15) : '') + '</p></section>';
+  }
+  function openCmp() {
+    if (!viewing || !mine) return;
+    var key = function (g) { return g.title.trim().toLowerCase(); };
+    var a = {}, b = {};
+    mine.forEach(function (g) { a[key(g)] = g; });
+    games.forEach(function (g) { b[key(g)] = g; });
+    var both = [], onlyF = [], onlyM = [];
+    Object.keys(b).forEach(function (k) { if (a[k]) both.push(k); else onlyF.push(b[k].title); });
+    Object.keys(a).forEach(function (k) { if (!b[k]) onlyM.push(a[k].title); });
+    function sum(list) {
+      var h = 0, d = 0; list.forEach(function (g) { h += Number(g.hours) || 0; if (g.status === 'beaten') d++; });
+      return { n: list.length, h: Math.round(h * 10) / 10, d: d };
+    }
+    var m = sum(mine), f = sum(games);
+    var html = '<table class="cmp-t"><tr><th></th><th>Ты</th><th>' + esc(viewing.nick) + '</th></tr>' + cmpRow('Игр', m.n, f.n) + cmpRow('Часов', m.h, f.h) + cmpRow('Пройдено', m.d, f.d) + '</table>';
+    if (both.length) {
+      html += '<section class="fsec"><h3>Общие игры · ' + both.length + '</h3>';
+      both.slice(0, 15).forEach(function (k) {
+        var x = a[k], y = b[k], rt = function (g) { return g.rating > 0 ? g.rating : '—'; };
+        html += '<div class="frow"><span class="fnick">' + esc(y.title) + '</span><span class="hint">оценка: ты ' + rt(x) + ' · друг ' + rt(y) + '</span></div>';
+      });
+      html += '</section>';
+    } else html += '<p class="hint">Общих игр пока нет.</p>';
+    html += cmpList('Есть у друга, нет у тебя', onlyF) + cmpList('Есть у тебя, нет у друга', onlyM);
+    $('#cmp-t').textContent = 'Ты и ' + viewing.nick;
+    $('#cmp-body').innerHTML = html;
+    $('#cmp').hidden = false;
   }
 
   function setViewing() {
@@ -942,13 +1085,13 @@
     viewing = { id: uid, nick: nick, avatar: f ? f.avatar : 0, bio: f ? f.bio : '', fav: f ? f.fav : '' };
     games = r.data.map(fromRow); loaded = true;
     $('#fr').hidden = true;
-    setViewing(); render();
+    setViewing(); render(); loadReactions();
     window.scrollTo(0, 0);
   }
   function leaveView() {
     if (!viewing) return;
     games = mine || []; mine = null; viewing = null;
-    setViewing(); render();
+    setViewing(); render(); loadReactions();
   }
 
   function bindSocial() {
@@ -958,6 +1101,12 @@
     $('#awards').addEventListener('click', openAch);
     $('#friends').addEventListener('click', openFriends);
     $('#v-back').addEventListener('click', leaveView);
+    $('#v-cmp').addEventListener('click', openCmp);
+    $('#cmp-close').addEventListener('click', function () { $('#cmp').hidden = true; });
+    $('#rec-close').addEventListener('click', function () { $('#rec').hidden = true; });
+    $('#cmp').addEventListener('mousedown', function (e) { if (e.target === $('#cmp')) $('#cmp').hidden = true; });
+    $('#rec').addEventListener('mousedown', function (e) { if (e.target === $('#rec')) $('#rec').hidden = true; });
+    $('#rec-form').addEventListener('submit', sendRec);
     $('#fr-close').addEventListener('click', function () { $('#fr').hidden = true; });
     $('#aw-close').addEventListener('click', function () { $('#aw').hidden = true; });
     $('#fr').addEventListener('mousedown', function (e) { if (e.target === $('#fr')) $('#fr').hidden = true; });
