@@ -113,8 +113,8 @@
     return out;
   }
   function fmt(h) { h = Number(h) || 0; return Number.isInteger(h) ? String(h) : h.toFixed(1); }
-  function toast(msg) {
-    var t = $('#toast'); t.textContent = msg; t.hidden = false;
+  function toast(msg, kind) {
+    var t = $('#toast'); t.className = 'toast' + (kind ? ' ' + kind : ''); t.textContent = msg; t.hidden = false;
     clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.hidden = true; }, 3200);
   }
   function errText(e) {
@@ -226,6 +226,28 @@
   }
 
   /* ---------- отрисовка ---------- */
+  var reduceMotion = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  function fxOn() {
+    var d = document.documentElement;
+    return !reduceMotion && d.getAttribute('data-fx') !== 'off' && d.getAttribute('data-theme') === 'arcade';
+  }
+  function setNum(el, text, delay) {
+    if (el._t === text) return;
+    var first = el._t === undefined; el._t = text;
+    clearInterval(el._i);
+    if (first || !fxOn() || !/^\d+$/.test(text)) { el.textContent = text; return; }
+    var n = 0, len = text.length;
+    el._i = setInterval(function () {
+      n++;
+      if (n < 9 + delay) el.textContent = String(Math.floor(Math.random() * Math.pow(10, len))).padStart(len, '0');
+      else { clearInterval(el._i); el.textContent = text; }
+    }, 55);
+  }
+  var luTimer = null;
+  function showLevelUp(n) {
+    var el = $('#lvlup'); $('#lu-n').textContent = 'LVL ' + n; el.hidden = false;
+    clearTimeout(luTimer); luTimer = setTimeout(function () { el.hidden = true; }, 2600);
+  }
   function renderHud() {
     var p = profile();
     $('#lvl').textContent = 'LVL ' + String(p.lvl).padStart(2, '0');
@@ -233,9 +255,9 @@
     $('#xp').textContent = 'XP ' + p.xp;
     $('#xp-next').textContent = 'до LVL ' + (p.lvl + 1) + ': ' + (p.hi - p.xp);
     $('#xpbar').innerHTML = seg(Math.round(20 * (p.xp - p.lo) / (p.hi - p.lo)), 20);
-    $('#s-games').textContent = p.n;
-    $('#s-hours').textContent = fmt(Math.round(p.hours * 10) / 10);
-    $('#s-done').textContent = p.beaten;
+    setNum($('#s-games'), String(p.n), 0);
+    setNum($('#s-hours'), fmt(Math.round(p.hours * 10) / 10), 3);
+    setNum($('#s-done'), String(p.beaten), 6);
     $('#s-avg').textContent = p.avg == null ? '—' : p.avg.toFixed(1);
   }
   function renderTabs() {
@@ -267,7 +289,7 @@
     var st = STATUS[g.status] || STATUS.queue;
     var segs = Math.round((g.status === 'beaten' ? 100 : (g.progress || 0)) / 10);
     var ro = !!viewing, ed = ro ? '' : ' data-act="edit" data-id="' + esc(g.id) + '"';
-    var h = '<article class="panel card" style="--c:' + st.color + '">';
+    var h = '<article class="panel card' + (g.status === 'beaten' ? ' beaten' : '') + '" style="--c:' + st.color + '">';
     h += '<div class="cover"' + ed + ' aria-hidden="true">' + (g.cover ? '<img src="' + esc(g.cover) + '" alt="">' : sprite(g.title)) + '</div><div class="cbody">';
     h += '<button class="head" type="button"' + ed + (ro ? ' disabled' : '') + ' aria-label="' + (ro ? '' : 'Изменить: ') + esc(g.title) + '">';
     h += '<span class="ht"><span class="title">' + esc(g.title) + '</span>';
@@ -294,7 +316,7 @@
     }
     if (!games.length) {
       el.innerHTML = '<div class="panel empty" style="grid-column:1/-1"><div style="color:var(--accent)">' + pix(CART, 72) + '</div>' +
-        '<h2>Картридж пуст<span class="blink">_</span></h2><p>Здесь будет твоя коллекция: во что играешь, что ждёт в очереди, что уже пройдено. Добавь первую игру или загрузи несколько примеров, чтобы посмотреть, как всё выглядит.</p>' +
+        '<div class="coin blink">INSERT COIN</div><h2>Картридж пуст<span class="blink">_</span></h2><p>Здесь будет твоя коллекция: во что играешь, что ждёт в очереди, что уже пройдено. Добавь первую игру или загрузи несколько примеров, чтобы посмотреть, как всё выглядит.</p>' +
         '<div class="row"><button class="btn primary" type="button" data-act="new">+ Новая игра</button><button class="btn" type="button" data-act="demo">Загрузить примеры</button></div></div>';
       return;
     }
@@ -435,15 +457,15 @@
   /* ---------- тема ---------- */
   function applyTheme(t, persist) {
     document.documentElement.setAttribute('data-theme', t);
-    if (persist) { try { localStorage.setItem('gamelog.theme', t); } catch (e) {} }
+    if (persist) { try { localStorage.setItem('gamelog.skin', t); } catch (e) {} }
     var b = $('#theme');
     if (b) {
-      b.innerHTML = pix(t === 'dark' ? MOON : SUN, 20);
-      var label = 'Тема: ' + (t === 'dark' ? 'тёмная' : 'светлая') + '. Переключить';
+      b.innerHTML = pix(t === 'dark' ? MOON : t === 'arcade' ? STAR : SUN, 20);
+      var label = 'Тема: ' + (t === 'dark' ? 'тёмная' : t === 'arcade' ? 'аркада' : 'светлая') + '. Переключить';
       b.setAttribute('aria-label', label); b.title = label;
     }
     var m = document.querySelector('meta[name="theme-color"]');
-    if (m) m.setAttribute('content', t === 'dark' ? '#15122e' : '#cdd6ad');
+    if (m) m.setAttribute('content', t === 'dark' ? '#15122e' : t === 'arcade' ? '#14050c' : '#cdd6ad');
   }
 
   async function submitAuth(e) {
@@ -494,6 +516,7 @@
     $('#acc-nick').value = me.nick; $('#acc-nick-err').hidden = true; $('#acc-share').checked = me.share;
     $('#acc-bio').value = me.bio; $('#acc-fav').value = me.fav; $('#acc-prof-err').hidden = true; drawAvPicker();
     $('#acc-ver').textContent = 'GameLOG ' + VERSION;
+    $('#acc-fx').checked = document.documentElement.getAttribute('data-fx') !== 'off';
     $('#acc').hidden = false;
     var d = $('#acc-del'); d.classList.remove('armed'); d.textContent = 'Удалить аккаунт';
   }
@@ -580,7 +603,8 @@
     $('#add').addEventListener('click', function () { openModal(null); });
     $('#acct').addEventListener('click', openAccount);
     $('#theme').addEventListener('click', function () {
-      applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark', true);
+      var cur = document.documentElement.getAttribute('data-theme');
+      applyTheme(cur === 'arcade' ? 'light' : cur === 'light' ? 'dark' : 'arcade', true);
     });
     $('#a-resend').addEventListener('click', async function () {
       var email = $('#a-email').value.trim();
@@ -698,7 +722,7 @@
   }
 
   /* ---------- Beta v2.0: ники, друзья, достижения ---------- */
-  var VERSION = 'Beta v2.2';
+  var VERSION = 'Beta v2.3';
   var NICK_RE = /^[A-Za-z0-9_А-Яа-яЁё]{3,20}$/;
   var me = { nick: '', share: true, avatar: 0, bio: '', fav: '' };
   var rel = { friends: [], incoming: [], outgoing: [] };
@@ -780,12 +804,16 @@
   }
   function checkAch() {
     if (viewing || !loaded || !user || !socialLoaded) return;
+    var pr = profile(), lk = 'gamelog.lvl.' + user.id, pl = NaN;
+    try { pl = parseInt(localStorage.getItem(lk), 10); } catch (e) {}
+    if (!isNaN(pl) && pr.lvl > pl) showLevelUp(pr.lvl);
+    try { localStorage.setItem(lk, String(pr.lvl)); } catch (e) {}
     var done = achCalc(games, true).filter(function (x) { return x.done; }).map(function (x) { return x.a.id; });
     var key = 'gamelog.ach.' + user.id, prev = null;
     try { prev = JSON.parse(localStorage.getItem(key) || 'null'); } catch (e) {}
     if (Array.isArray(prev)) {
       var fresh = ACH.filter(function (a) { return done.indexOf(a.id) >= 0 && prev.indexOf(a.id) < 0; });
-      if (fresh.length) toast('Достижение: ' + fresh.map(function (a) { return a.name; }).join(', '));
+      if (fresh.length) toast('Достижение: ' + fresh.map(function (a) { return a.name; }).join(', '), 'ach');
     }
     try { localStorage.setItem(key, JSON.stringify(done)); } catch (e) {}
   }
@@ -907,7 +935,7 @@
       h += '<section class="fsec"><h3>Лидеры среди друзей</h3>';
       board.forEach(function (x, i) {
         var sub = x.share || x.me ? 'LVL ' + x.lvl + ' · ' + x.hours + ' ч · пройдено ' + x.beaten : 'Коллекция закрыта';
-        h += '<div class="frow' + (x.me ? ' me' : '') + '"><span class="fwho"><span class="rk">#' + (i + 1) + '</span><span class="fav">' + avHtml(x.avatar, 24) + '</span><span class="fname"><span class="fnick">' + esc(x.nick) + (x.me ? ' (ты)' : '') + '</span><span class="fsub">' + esc(sub) + '</span></span></span><span class="hint">' + (x.share || x.me ? x.xp + ' XP' : '—') + '</span></div>';
+        h += '<div class="frow' + (x.me ? ' me' : '') + (i === 0 && x.xp > 0 ? ' top' : '') + '"><span class="fwho"><span class="rk">' + (i === 0 && x.xp > 0 ? '<span class="crown">' + pix(CROWN, 18) + '</span>' : '#' + (i + 1)) + '</span><span class="fav">' + avHtml(x.avatar, 24) + '</span><span class="fname"><span class="fnick">' + esc(x.nick) + (x.me ? ' (ты)' : '') + '</span><span class="fsub">' + esc(sub) + '</span></span></span><span class="hint">' + (x.share || x.me ? x.xp + ' XP' : '—') + '</span></div>';
       });
       h += '</section>';
     }
@@ -1152,6 +1180,12 @@
       if (r.error) { er.textContent = 'Не удалось сохранить. Попробуй ещё раз.'; er.hidden = false; return; }
       me.bio = bio; me.fav = fav; toast('Профиль сохранён');
     });
+    $('#acc-fx').addEventListener('change', function (e) {
+      var v = e.target.checked ? 'on' : 'off';
+      document.documentElement.setAttribute('data-fx', v);
+      try { localStorage.setItem('gamelog.fx', v); } catch (er) {}
+    });
+    $('#lvlup').addEventListener('click', function () { $('#lvlup').hidden = true; });
     $('#acc-share').addEventListener('change', async function (e) {
       var v = e.target.checked;
       var r = await sb.from('profiles').update({ share_collection: v }).eq('user_id', user.id);
@@ -1167,7 +1201,7 @@
     $('#logo').innerHTML = '<div style="color:var(--accent)">' + pix(HEART, 40) + '</div>';
     $('#a-logo').innerHTML = '<span style="color:var(--accent)">' + pix(HEART, 28) + '</span>';
     $('#avatar').innerHTML = '<div style="color:var(--accent)">' + pix(HEART, 40) + '</div>';
-    applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light', false);
+    applyTheme(document.documentElement.getAttribute('data-theme') || 'arcade', false);
     if (cfg.APP_ENV && cfg.APP_ENV !== 'production') {
       $('#env').hidden = false;
       document.title = '[ТЕСТ] ' + document.title;
