@@ -1,11 +1,8 @@
-// Тема оформления и эффекты. Подключается в <head> до отрисовки, чтобы не было мигания.
-// По умолчанию тёмная; светлую человек включает кнопкой в шапке. Прежнее значение «arcade» считается тёмной.
+// Оформление «Аркада» (игровые автоматы США 2000-х) единственное. Подключается в <head> до отрисовки.
+// Эффекты можно выключить галочкой в аккаунте («Анимации и свечение»).
 (function () {
-  var t = 'dark', fx = 'on', d = document.documentElement;
-  try {
-    var s = localStorage.getItem('gamelog.skin'); if (s === 'light') t = 'light';
-    if (localStorage.getItem('gamelog.fx') === 'off') fx = 'off';
-  } catch (e) {}
-  d.setAttribute('data-theme', t);
+  var fx = 'on', d = document.documentElement;
+  try { if (localStorage.getItem('gamelog.fx') === 'off') fx = 'off'; } catch (e) {}
+  d.setAttribute('data-theme', 'dark');
   d.setAttribute('data-fx', fx);
 })();

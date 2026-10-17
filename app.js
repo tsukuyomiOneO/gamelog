@@ -602,10 +602,6 @@
     $('#sort').addEventListener('change', function (e) { view.sort = e.target.value; renderGrid(); });
     $('#add').addEventListener('click', function () { openModal(null); });
     $('#acct').addEventListener('click', openAccount);
-    $('#theme').addEventListener('click', function () {
-      var cur = document.documentElement.getAttribute('data-theme');
-      applyTheme(cur === 'dark' ? 'light' : 'dark', true);
-    });
     $('#a-resend').addEventListener('click', async function () {
       var email = $('#a-email').value.trim();
       if (!/^\S+@\S+\.\S+$/.test(email)) return authMsg('err', 'Введи почту, на которую отправить письмо.');
@@ -722,7 +718,7 @@
   }
 
   /* ---------- Beta v2.0: ники, друзья, достижения ---------- */
-  var VERSION = 'Beta v2.4';
+  var VERSION = 'Beta v2.5';
   var NICK_RE = /^[A-Za-z0-9_А-Яа-яЁё]{3,20}$/;
   var me = { nick: '', share: true, avatar: 0, bio: '', fav: '' };
   var rel = { friends: [], incoming: [], outgoing: [] };
@@ -1201,7 +1197,7 @@
     $('#logo').innerHTML = '<div style="color:var(--accent)">' + pix(HEART, 40) + '</div>';
     $('#a-logo').innerHTML = '<span style="color:var(--accent)">' + pix(HEART, 28) + '</span>';
     $('#avatar').innerHTML = '<div style="color:var(--accent)">' + pix(HEART, 40) + '</div>';
-    applyTheme(document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark', false);
+    applyTheme('dark', false);
     if (cfg.APP_ENV && cfg.APP_ENV !== 'production') {
       $('#env').hidden = false;
       document.title = '[ТЕСТ] ' + document.title;

@@ -400,7 +400,7 @@ select.field {
 .cmp-t td.w { font-weight: 700; color: var(--done); }
 .cmp-l { margin: 0; font-size: 13px; color: var(--dim); overflow-wrap: anywhere; }
 
-/* ===== Beta v2.4: стиль игровых автоматов США 2000-х для светлой и тёмной тем ===== */
+/* ===== Beta v2.5: единственное оформление «Аркада» (игровые автоматы США 2000-х) ===== */
 .coin { display: none; }
 .lvlup { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; background: rgba(8, 1, 5, 0.6); cursor: pointer; animation: luback 2.6s steps(1) forwards; }
 .lu-in { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 26px 34px; background: var(--surface); border: 4px solid var(--star); color: var(--star); font-family: 'Bungee', var(--f-display); text-align: center; box-shadow: 0 0 0 3px #000, 0 0 40px var(--star); animation: lupop 0.5s ease-out, lublink 0.4s steps(1) 0.5s 5; }
@@ -476,27 +476,3 @@ html[data-fx="off"] body::after { display: none; }
   :root .hud, :root .modal { outline-width: 4px; outline-offset: 4px; }
   :root .stat dd { font-size: 14px; padding: 4px 4px; }
 }
-
-/* Светлая тема: «дневной» автомат, кремовый корпус, красный и золото */
-:root[data-theme="light"] {
-  --bg: #ffe9b0; --grid: #f6d98f; --surface: #fff6dc; --surface2: #ffe29a; --field: #fffdf3;
-  --ink: #2b0c19; --dim: #7a4a3a; --line: #7a0f2a; --shadow: #2b0c19; --faint: #d9b36a;
-  --accent: #e0112f; --on-accent: #fff; --star: #d98a00; --play: #1d5fc4; --done: #1f8f3f;
-  --queue: #7b3fb8; --wish: #c47a00; --drop: #c62828; --scrim: rgba(43, 12, 25, 0.6);
-  --bulb: #e0112f; --bulb2: #f3b23a;
-}
-:root[data-theme="light"] body { background-image: radial-gradient(ellipse at 50% -10%, rgba(224, 17, 47, 0.16), transparent 60%), linear-gradient(var(--grid) 2px, transparent 2px), linear-gradient(90deg, var(--grid) 2px, transparent 2px); }
-:root[data-theme="light"] body::before { box-shadow: inset 0 0 120px rgba(122, 15, 42, 0.28); }
-:root[data-theme="light"] body::after { opacity: 0.1; }
-:root[data-theme="light"] .panel { box-shadow: 0 0 0 2px var(--shadow), 5px 5px 0 var(--shadow), 0 0 18px rgba(217, 138, 0, 0.18); }
-:root[data-theme="light"] .brand h1 { color: var(--accent); text-shadow: 0 2px 0 #7a0f2a, 0 0 12px rgba(224, 17, 47, 0.35); }
-:root[data-theme="light"] .mh h2, :root[data-theme="light"] .ver, :root[data-theme="light"] .lvl { color: var(--accent); text-shadow: none; }
-:root[data-theme="light"] .coin { color: var(--accent); text-shadow: 0 2px 0 rgba(122, 15, 42, 0.4); }
-:root[data-theme="light"] .btn { background: linear-gradient(#fffaf0, #ffd98a); color: var(--ink); box-shadow: 0 4px 0 var(--shadow), 0 0 0 2px var(--shadow); }
-:root[data-theme="light"] .btn:active { box-shadow: 0 0 0 2px var(--shadow); }
-:root[data-theme="light"] .btn.primary { background: linear-gradient(#ff6a82, #d1002f); color: #fff; box-shadow: 0 4px 0 #6d0017, 0 0 0 2px var(--shadow); }
-:root[data-theme="light"] .chip { background: linear-gradient(#fffaf0, #ffe29a); }
-:root[data-theme="light"] .lu-in b { text-shadow: 0 2px 0 #7a0f2a; }
-:root[data-theme="light"] .lu-in { color: var(--accent); border-color: var(--accent); box-shadow: 0 0 0 3px var(--shadow), 0 0 30px var(--star); }
-:root[data-theme="light"] .frow.top { box-shadow: 0 0 14px rgba(217, 138, 0, 0.5); }
-:root[data-theme="light"] .crown { color: var(--star); }
