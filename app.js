@@ -160,7 +160,7 @@
   function saveGame(g, blob, removeCover) {
     g.updated = Date.now(); if (!g.added) g.added = g.updated;
     var i = games.findIndex(function (x) { return x.id === g.id; });
-    if (i >= 0) games[i] = g; else games.push(g);
+    if (i >= 0) games[i] = g; else { games.push(g); animIn = g.id; }
     render();
     var snap = Object.assign({}, g);
     return queue(snap.id, async function () {
@@ -185,8 +185,11 @@
   }
   function removeGame(id) {
     var g = games.find(function (x) { return x.id === id; });
-    games = games.filter(function (x) { return x.id !== id; });
-    render();
+    var ce = fxOn() ? cardEl(id) : null;
+    if (ce) {
+      ce.classList.add('eject');
+      setTimeout(function () { games = games.filter(function (x) { return x.id !== id; }); render(); }, 440);
+    } else { games = games.filter(function (x) { return x.id !== id; }); render(); }
     return queue(id, async function () {
       if (g && g.cover_path) await sb.storage.from(BUCKET).remove([g.cover_path]);
       var r = await sb.from('games').delete().eq('id', id);
@@ -291,7 +294,7 @@
     var st = STATUS[g.status] || STATUS.queue;
     var segs = Math.round((g.status === 'beaten' ? 100 : (g.progress || 0)) / 10);
     var ro = !!viewing, ed = ro ? '' : ' data-act="edit" data-id="' + esc(g.id) + '"';
-    var h = '<article class="panel card' + (g.status === 'beaten' ? ' beaten' : '') + '" style="--c:' + st.color + '">';
+    var h = '<article class="panel card' + (g.status === 'beaten' ? ' beaten' : '') + '" data-gid="' + esc(g.id) + '" style="--c:' + st.color + '"><i class="grip" aria-hidden="true"></i>';
     h += '<div class="cover"' + ed + ' aria-hidden="true">' + (g.cover ? '<img src="' + esc(g.cover) + '" alt="">' : sprite(g.title)) + '</div><div class="cbody">';
     h += '<button class="head" type="button"' + ed + (ro ? ' disabled' : '') + ' aria-label="' + (ro ? '' : 'Изменить: ') + esc(g.title) + '">';
     h += '<span class="ht"><span class="title">' + esc(g.title) + '</span>';
@@ -306,7 +309,13 @@
     h += '<div class="foot">' + (g.rating > 0 ? stars(g.rating, 14) : '<span class="meta">Без оценки</span>');
     h += '<span class="hours">' + (g.status === 'playing' && !ro ? '<button class="plus" type="button" data-act="plus" data-id="' + esc(g.id) + '" aria-label="Добавить час к «' + esc(g.title) + '»">+1 Ч</button>' : '') + fmt(g.hours) + ' Ч</span></div>';
     h += cardExtra(g, ro);
-    return h + '</div></article>';
+    return h + '</div><i class="pins" aria-hidden="true"></i></article>';
+  }
+  var animIn = null, animAt = {};
+  function cardEl(id) {
+    var l = document.querySelectorAll('#grid .card');
+    for (var i = 0; i < l.length; i++) if (l[i].getAttribute('data-gid') === id) return l[i];
+    return null;
   }
   function renderGrid() {
     var el = $('#grid');
@@ -330,6 +339,13 @@
       return;
     }
     el.innerHTML = list.map(card).join('');
+    if (animIn) { animAt[animIn] = Date.now(); animIn = null; }
+    for (var k in animAt) {
+      var el2 = Date.now() - animAt[k];
+      if (el2 > 700) { delete animAt[k]; continue; }
+      var ne = cardEl(k);
+      if (ne && fxOn()) { ne.classList.add('ins'); ne.style.animationDelay = (-el2) + 'ms'; }
+    }
   }
   function render() { renderHud(); renderTabs(); renderGrid(); drawAvatar(); checkAch(); }
 
@@ -722,7 +738,7 @@
   }
 
   /* ---------- Beta v2.0: ники, друзья, достижения ---------- */
-  var VERSION = 'Beta v2.6';
+  var VERSION = 'Beta v2.7';
   var NICK_RE = /^[A-Za-z0-9_А-Яа-яЁё]{3,20}$/;
   var me = { nick: '', share: true, avatar: 0, bio: '', fav: '' };
   var rel = { friends: [], incoming: [], outgoing: [] };

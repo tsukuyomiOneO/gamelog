@@ -496,3 +496,35 @@ html[data-fx="off"] body::after { display: none; }
 .cact .rxb, .cact .rxc { white-space: nowrap; }
 .cact.ro { height: 72px; display: grid; grid-template-columns: 1fr 1fr; align-content: start; }
 .cact.ro .rxb { text-align: center; }
+
+/* Beta v2.7: карточки-картриджи для игрового автомата */
+.card { position: relative; padding: 30px 14px 34px; border-radius: 0; background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 40%); }
+.card .grip {
+  position: absolute; left: 0; right: 0; top: 0; height: 16px; pointer-events: none;
+  background: repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.55) 0 3px, rgba(255, 255, 255, 0.07) 3px 6px);
+  border-bottom: 3px solid var(--c, var(--line));
+}
+.card .grip::before { content: ''; position: absolute; left: 10px; top: 4px; width: 6px; height: 6px; background: var(--faint); }
+.card .grip::after { content: ''; position: absolute; right: 10px; top: 4px; width: 6px; height: 6px; background: var(--faint); }
+.card .pins {
+  position: absolute; left: 14%; right: 14%; bottom: 8px; height: 14px; pointer-events: none;
+  background: repeating-linear-gradient(90deg, var(--star) 0 4px, #1a0710 4px 8px);
+  border: 2px solid #000; box-shadow: 0 0 0 2px var(--faint), inset 0 -4px 0 rgba(0, 0, 0, 0.35);
+  opacity: 0.9;
+}
+.cover { border-width: 4px; outline: 2px solid var(--c, var(--line)); outline-offset: 2px; box-shadow: 4px 4px 0 var(--shadow); }
+.card.beaten .pins { box-shadow: 0 0 0 2px var(--star), 0 0 12px rgba(255, 210, 63, 0.6), inset 0 -4px 0 rgba(0, 0, 0, 0.35); }
+@keyframes cartin {
+  0% { transform: translateY(-90px) scale(0.96); opacity: 0; filter: brightness(2); }
+  55% { opacity: 1; transform: translateY(8px); filter: brightness(1.4); }
+  75% { transform: translateY(-3px); }
+  100% { transform: none; filter: none; }
+}
+@keyframes carteject {
+  0% { transform: none; opacity: 1; }
+  22% { transform: translateY(8px); }
+  100% { transform: translateY(-110px) rotate(-2deg) scale(0.96); opacity: 0; filter: brightness(1.8); }
+}
+.card.ins { animation: cartin 0.7s cubic-bezier(0.3, 0.7, 0.4, 1) both; z-index: 2; }
+.card.eject { animation: carteject 0.44s ease-in both; pointer-events: none; }
+@media (max-width: 520px) { .card { padding: 28px 12px 34px; } .card .pins { left: 10%; right: 10%; } }
