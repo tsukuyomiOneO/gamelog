@@ -273,14 +273,16 @@
   }
   function cardExtra(g, ro) {
     var K = [['fire', 'Огонь'], ['want', 'Тоже хочу'], ['hurry', 'Пройди!']];
-    var c = rx.cnt[g.id] || {}, h = '<div class="cact">';
+    var c = rx.cnt[g.id] || {}, h = '<div class="cact' + (ro ? ' ro' : '') + '">';
     if (ro) {
       K.forEach(function (k) {
         h += '<button class="rxb" type="button" data-act="rx" data-id="' + esc(g.id) + '" data-k="' + k[0] + '" aria-pressed="' + !!rx.mine[g.id + ':' + k[0]] + '">' + k[1] + '</button>';
       });
       h += '<button class="rxb add" type="button" data-act="wishadd" data-id="' + esc(g.id) + '">В «Хочу»</button>';
     } else {
-      K.forEach(function (k) { if (c[k[0]]) h += '<span class="rxc">' + k[1] + ' ' + c[k[0]] + '</span>'; });
+      var tot = 0, tt = [];
+      K.forEach(function (k) { if (c[k[0]]) { tot += c[k[0]]; tt.push(k[1] + ' ' + c[k[0]]); } });
+      if (tot) h += '<span class="rxc" title="' + esc(tt.join(', ')) + '">Реакции ' + tot + '</span>';
       h += '<button class="rxb" type="button" data-act="rec" data-id="' + esc(g.id) + '">Посоветовать</button>';
     }
     return h + '</div>';
@@ -297,8 +299,10 @@
     h += '<div class="badges"><span class="badge"><i></i>' + st.label + '</span>' + (g.genre ? '<span class="badge plain">' + esc(g.genre) + '</span>' : '') + '</div>';
     if (g.status !== 'wish') {
       h += '<div class="prog"><div class="prog-l"><span>Прогресс</span><span>' + (g.status === 'beaten' ? 100 : (g.progress || 0)) + '%</span></div><div class="segbar" style="--c:' + st.color + '">' + seg(segs, 10) + '</div></div>';
+    } else {
+      h += '<div class="prog ph" aria-hidden="true"><div class="prog-l"><span>&nbsp;</span></div><div class="segbar"></div></div>';
     }
-    if (g.notes) h += '<p class="note">' + esc(g.notes) + '</p>';
+    h += '<p class="note' + (g.notes ? '' : ' nn') + '">' + (g.notes ? esc(g.notes) : '&nbsp;') + '</p>';
     h += '<div class="foot">' + (g.rating > 0 ? stars(g.rating, 14) : '<span class="meta">Без оценки</span>');
     h += '<span class="hours">' + (g.status === 'playing' && !ro ? '<button class="plus" type="button" data-act="plus" data-id="' + esc(g.id) + '" aria-label="Добавить час к «' + esc(g.title) + '»">+1 Ч</button>' : '') + fmt(g.hours) + ' Ч</span></div>';
     h += cardExtra(g, ro);
@@ -718,7 +722,7 @@
   }
 
   /* ---------- Beta v2.0: ники, друзья, достижения ---------- */
-  var VERSION = 'Beta v2.5';
+  var VERSION = 'Beta v2.6';
   var NICK_RE = /^[A-Za-z0-9_А-Яа-яЁё]{3,20}$/;
   var me = { nick: '', share: true, avatar: 0, bio: '', fav: '' };
   var rel = { friends: [], incoming: [], outgoing: [] };
@@ -735,6 +739,7 @@
   var FLAME = ['...X...', '..XX...', '..XXX..', '.XXXXX.', 'XXXXXXX', 'XXX.XXX', 'XXX.XXX', '.XXXXX.'];
   var PAD = ['..XXXXXXX..', '.XXXXXXXXX.', 'XX.XXXXX.XX', 'X...XXX.X.X', 'XX.XXXXX.XX', '.XXXXXXXXX.'];
   var SKULL = ['.XXXXX.', 'XXXXXXX', 'X..X..X', 'XXXXXXX', '.XXXXX.', '.X.X.X.'];
+  var PAD = ['..XXXXXXXXX..', '.XXXXXXXXXXX.', 'XXX.XXXXX.XXX', 'XX...XXXXXX.X', 'XXX.XXXXX.XXX', 'XXXXXXXXXXXXX', '.XXX.....XXX.'];
   var FRIENDS = ['.XX...XX.', '.XX...XX.', 'XXXX.XXXX', 'XXXX.XXXX', 'X..X.X..X'];
 
   var SLIME = ['........', '..XXXX..', '.XXXXXX.', 'XX.XX.XX', 'XXXXXXXX', 'XXXXXXXX', '.XXXXXX.', '........'];
@@ -1121,7 +1126,7 @@
   function bindSocial() {
     $('#ver').textContent = VERSION;
     $('#awards').innerHTML = pix(TROPHY, 20);
-    $('#friends').innerHTML = pix(FRIENDS, 20) + '<span class="nb" id="fr-badge" hidden></span>';
+    $('#friends').innerHTML = pix(PAD, 22) + '<span class="nb" id="fr-badge" hidden></span>';
     $('#awards').addEventListener('click', openAch);
     $('#friends').addEventListener('click', openFriends);
     $('#v-back').addEventListener('click', leaveView);

@@ -474,3 +474,6 @@ language sql stable security definer set search_path = '' as $$
 $$;
 revoke all on function public.friends_board() from public, anon;
 grant execute on function public.friends_board() to authenticated;
+
+-- Beta v2.6: гарантируем право обновлять поля профиля
+grant update (nick, share_collection, avatar, bio, fav_game) on public.profiles to authenticated;
