@@ -640,3 +640,79 @@ html[data-fx="off"] body::after { display: none; }
 :root[data-fx="off"] .marq span, :root[data-fx="off"] .shelf.boot .spine { animation: none; }
 @media (prefers-reduced-motion: reduce) { .marq span, .shelf.boot .spine { animation: none; } }
 @media (max-width: 520px) { .shelf { padding: 18px 14px 34px; } .tip { top: 20px; } }
+
+/* Beta v3.2: полноценный корпус автомата */
+.shelf, .coin, .marq, .sign, .scr, .deck, .kick, .bay { user-select: none; -webkit-user-select: none; }
+.shelf {
+  display: flex; flex-direction: column; gap: 16px; max-width: 1040px; margin: 8px auto 0; padding: 22px 26px 18px;
+  border: 16px solid #000; border-image: repeating-linear-gradient(135deg, #8a1236 0 12px, #2a0714 12px 24px) 16;
+  background: linear-gradient(180deg, #1d0813, #0b0207); outline: 5px dotted var(--bulb, #ffb000); outline-offset: 6px;
+  box-shadow: inset 0 0 0 3px var(--star), inset 16px 0 26px -10px #ff2e63, inset -16px 0 26px -10px #5cf2ff, 0 0 40px rgba(255, 176, 0, 0.3);
+}
+.shelf::after { content: none; }
+.shelf > .panel { align-self: stretch; }
+.sign {
+  position: relative; text-align: center; padding: 16px 12px 0; background: radial-gradient(ellipse at 50% 0%, #6a1a32, #1d0813 75%);
+  border: 4px solid var(--star); box-shadow: 0 0 26px rgba(255, 176, 0, 0.45), inset 0 0 24px rgba(0, 0, 0, 0.7); display: flex; flex-direction: column; gap: 8px; align-items: center;
+}
+.sign b { font: 400 clamp(30px, 6vw, 56px)/1 var(--f-display); letter-spacing: 4px; color: var(--star); text-shadow: 0 0 12px #ff9d00, 0 0 34px #ff2e63, 3px 3px 0 #000; animation: flick 6s infinite; }
+.sign > span { font: 700 12px/1 var(--f-body); letter-spacing: 2px; color: #ffe9b0; }
+.sign .marq { align-self: stretch; margin: 0 -12px; border-width: 3px 0 0; }
+.scr {
+  position: relative; padding: 14px; background: #120509; border: 4px solid #000; border-radius: 22px; box-shadow: 0 0 0 4px var(--faint), inset 0 0 18px #000, 0 0 22px rgba(255, 176, 0, 0.2);
+}
+.scr-in {
+  position: relative; min-height: 220px; padding: 16px; border-radius: 14px / 18px; overflow: hidden; background: radial-gradient(ellipse at 50% 40%, #2a1306, #060201 80%);
+  box-shadow: inset 0 0 40px #000, inset 0 0 8px rgba(255, 176, 0, 0.4); color: var(--star); text-shadow: 0 0 8px rgba(255, 176, 0, 0.7); display: flex;
+}
+.scr-in::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.32) 0 2px, transparent 2px 4px); animation: pulse 3.2s ease-in-out infinite; }
+.scr-att { margin: auto; text-align: center; display: flex; flex-direction: column; gap: 12px; }
+.scr-att b { font: 400 clamp(20px, 4vw, 34px)/1 var(--f-display); letter-spacing: 3px; }
+.scr-att span { font: 700 13px/1 var(--f-body); letter-spacing: 2px; }
+.scr-att em { font: 700 12px/1.4 var(--f-body); font-style: normal; color: #ffe9b0; }
+.scr-game { display: flex; gap: 20px; width: 100%; align-items: center; }
+.scr-art { flex: none; width: 150px; aspect-ratio: 3 / 4; border: 4px solid var(--c); box-shadow: 0 0 16px var(--c); overflow: hidden; background: #000; }
+.scr-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.scr-art svg { width: 100%; height: 100%; padding: 12px; }
+.scr-txt { display: flex; flex-direction: column; gap: 9px; min-width: 0; flex: 1; }
+.scr-t { font: 600 clamp(22px, 4vw, 36px)/1.1 var(--f-pixel); color: #fff; text-shadow: 0 0 12px var(--c); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.scr-st { display: flex; align-items: center; gap: 8px; font: 700 13px/1 var(--f-body); text-transform: uppercase; color: var(--c); }
+.scr-st i { width: 10px; height: 10px; background: var(--c); box-shadow: 0 0 8px var(--c); }
+.scr-r { display: flex; justify-content: space-between; gap: 12px; font: 700 15px/1 var(--f-body); max-width: 420px; }
+.scr-r u { text-decoration: none; color: #b08a5a; font-size: 12px; letter-spacing: 1px; }
+.deck {
+  display: flex; align-items: center; justify-content: space-around; gap: 12px; padding: 16px 10px; background: linear-gradient(180deg, #3a0f22, #1a0710);
+  border: 4px solid #000; box-shadow: 0 0 0 3px var(--faint), inset 0 4px 0 rgba(255, 255, 255, 0.1); transform: perspective(500px) rotateX(8deg); transform-origin: 50% 0;
+}
+.stick { position: relative; width: 70px; height: 70px; display: grid; place-items: center; border-radius: 50%; background: radial-gradient(circle, #000 55%, #2a1018 56%); box-shadow: 0 0 0 3px #555; cursor: pointer; }
+.stick i { width: 34px; height: 34px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #ff7b8a, #c0112f 60%, #5a0618); box-shadow: 0 6px 0 #3a0410; transition: transform 0.1s steps(2); }
+.stick:active i { transform: translateY(4px) rotate(-6deg); }
+.btns { display: flex; gap: 12px; }
+.btns b { width: 34px; height: 34px; border-radius: 50%; border: 3px solid #000; box-shadow: 0 5px 0 #000; cursor: pointer; transition: transform 0.08s steps(2), box-shadow 0.08s steps(2); }
+.btns b:active { transform: translateY(4px); box-shadow: 0 1px 0 #000; }
+.btns .r { background: #ff3b5c; } .btns .y { background: #ffd23f; } .btns .g { background: #3fe08a; } .btns .b { background: #4aa3ff; }
+.coinb {
+  display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 14px; background: #000; border: 3px solid var(--star); color: var(--star); cursor: pointer;
+  font: 700 10px/1 var(--f-body); letter-spacing: 1px; box-shadow: 0 0 12px rgba(255, 210, 63, 0.4);
+}
+.coinb i { width: 6px; height: 34px; background: #000; border: 2px solid #777; box-shadow: 0 0 8px #ff3b5c; animation: pulse 1.2s steps(2) infinite; }
+.coinb.hit i { background: var(--star); box-shadow: 0 0 18px var(--star); }
+.coinb:active { transform: translateY(2px); }
+.bay {
+  position: relative; display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 22px 14px; padding: 36px 16px 16px;
+  background: #0a0206; border: 5px solid #3a1a0e; box-shadow: inset 0 0 30px #000, 0 0 0 2px #000;
+}
+.bay::before { content: 'ОТСЕК КАРТРИДЖЕЙ'; position: absolute; top: 10px; left: 50%; transform: translateX(-50%); font: 700 11px/1 var(--f-body); letter-spacing: 3px; color: var(--dim); }
+.kick { height: 34px; overflow: hidden; background: repeating-linear-gradient(90deg, #14050c 0 20px, #1d0813 20px 40px); border-top: 4px solid var(--star); display: flex; align-items: center; justify-content: center; }
+.kick span { font: 400 12px/1 var(--f-display); letter-spacing: 4px; color: var(--faint); white-space: nowrap; }
+.spine::after { top: -14px; }
+@media (max-width: 640px) {
+  .shelf { padding: 14px 10px; border-width: 10px; border-image-width: 10px; }
+  .scr-game { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .scr-art { width: 96px; }
+  .scr-in { min-height: 200px; padding: 12px; }
+  .stick { width: 50px; height: 50px; } .stick i { width: 24px; height: 24px; }
+  .bay { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (prefers-reduced-motion: reduce) { .sign b, .scr-in::after, .coinb i { animation: none; } }
+:root[data-fx="off"] .sign b, :root[data-fx="off"] .scr-in::after, :root[data-fx="off"] .coinb i { animation: none; }

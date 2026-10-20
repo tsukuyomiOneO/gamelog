@@ -359,7 +359,14 @@
     }
     el.className = view.mode === 'shelf' ? 'shelf' : 'grid';
     var shelfMode = view.mode === 'shelf';
-    el.innerHTML = (shelfMode ? '<div class="marq" aria-hidden="true"><span>★ GAMELOG ★ ВСТАВЬ МОНЕТУ ★ PRESS START ★ ВЫБЕРИ ИГРУ ★ GAMELOG ★ ВСТАВЬ МОНЕТУ ★ PRESS START ★ ВЫБЕРИ ИГРУ </span></div>' : '') + list.map(function (g, i) { return shelfMode ? spine(g, i) : card(g); }).join('');
+    var pf = profile();
+    var cab = '<div class="sign"><b>GameLOG</b><span>ИГР ' + pf.n + ' · ПРОЙДЕНО ' + pf.beaten + '</span><div class="marq" aria-hidden="true"><span>★ GAMELOG ★ ВСТАВЬ МОНЕТУ ★ PRESS START ★ ВЫБЕРИ ИГРУ ★ GAMELOG ★ ВСТАВЬ МОНЕТУ ★ PRESS START ★ ВЫБЕРИ ИГРУ </span></div></div>' +
+      '<div class="scr"><div class="scr-in" id="scr"></div></div>' +
+      '<div class="deck"><div class="stick"><i></i></div><div class="btns"><b class="r"></b><b class="y"></b></div>' +
+      '<button class="coinb" id="coin" type="button" aria-label="Вставить монету"><i></i><span>МОНЕТА</span></button>' +
+      '<div class="btns"><b class="g"></b><b class="b"></b></div><div class="stick"><i></i></div></div>';
+    el.innerHTML = shelfMode ? cab + '<div class="bay">' + list.map(function (g, i) { return spine(g, i); }).join('') + '</div><div class="kick" aria-hidden="true"><span>★ ARCADE ★ GAMELOG ★ ARCADE ★</span></div>' : list.map(card).join('');
+    if (shelfMode) scrAttract();
     if (shelfMode && shelfBoot && fxOn()) {
       shelfBoot = false; el.classList.add('boot');
       setTimeout(function () { el.classList.remove('boot'); }, 700 + list.length * 70);
@@ -771,6 +778,7 @@
   var LEAF = ['XXXXXX.', 'X....XX', 'X.XXX.X', 'X.....X', 'X.XXX.X', 'X.....X', 'X.XX..X', 'XXXXXXX'];
   var coopMap = {};
   var RELEASES = [
+    ['Beta v3.2', ['Полка стала полноценным автоматом: вывеска, CRT-экран с данными игры, пульт с джойстиками и кнопкой «Монета», отсек картриджей, цоколь', 'Экран показывает игру под курсором, в покое «ВСТАВЬ МОНЕТУ» и лидера по часам', 'Надписи автомата не выделяются']],
     ['Beta v3.1', ['Полка: корпус автомата с бегущей строкой и неоновыми боками', 'Глянец на картриджах, подсветка слотов цветом статуса', 'Вставка картриджа с отскоком и «кликом», выброс на пружине', 'Включение автомата: слоты загораются волной', 'Управление стрелками и курсор ▼, табло с данными при наведении']],
     ['Beta v3.0', ['Звуки 8-бит (включаются в аккаунте)', 'Ежедневный бонус и серия дней подряд', 'Режим «Полка»: отсек автомата, картриджи в слотах', 'Итоги года: картинка со статистикой, можно скачать', 'Совместные игры 2P: отметь друга и сравнивай прогресс', 'Листочек «Что нового» у версии']],
     ['Beta v2.9', ['Лимит часов на игру до 99999', 'Большие числа сокращаются: 10.3к, 1.2м']],
@@ -863,9 +871,36 @@
     h += '<span class="c-label"><span class="c-cover">' + (g.cover ? '<img src="' + esc(g.cover) + '" alt="">' : sprite(g.title)) + '</span></span>';
     h += '<span class="c-t">' + esc(g.title) + '</span><span class="c-m"><b>' + fmtK(g.hours) + ' Ч</b><em>' + (g.rating > 0 ? '★' + g.rating : '') + '</em></span></span>';
     h += '<i class="c-shine"></i>' + (g.coop ? '<span class="sp-2p">2P</span>' : '') + '</span>';
-    h += '<span class="tip"><b>' + esc(g.title) + '</b>' + esc(st.label) + ' · ' + fmtK(g.hours) + ' Ч' + pr + (g.rating > 0 ? ' · ★' + g.rating : '') + (cf ? '<br>2P ' + esc(cf.nick) + (cp != null ? ': ' + cp + '%' : '') : '') + '</span>';
     h += '<span class="mouth"><i class="led"></i><span>' + esc(st.label) + '</span></span></button>';
     return h;
+  }
+  var credits = 0, scrId = null;
+  function scrAttract() {
+    var el = $('#scr'); if (!el) return;
+    scrId = null;
+    var top = games.slice().sort(function (a, b) { return (b.hours || 0) - (a.hours || 0); })[0];
+    el.innerHTML = '<div class="scr-att"><b class="blink">ВСТАВЬ МОНЕТУ</b><span>КРЕДИТЫ: ' + String(credits).padStart(2, '0') + '</span>' +
+      (top && top.hours ? '<em>ЛИДЕР ПО ЧАСАМ: ' + esc(top.title) + ' · ' + fmtK(top.hours) + ' Ч</em>' : '<em>НАВЕДИ НА КАРТРИДЖ</em>') + '</div>';
+  }
+  function scrShow(id) {
+    var el = $('#scr'), g = games.filter(function (x) { return x.id === id; })[0];
+    if (!el || !g || scrId === id) return;
+    scrId = id;
+    var st = STATUS[g.status] || STATUS.queue, p = g.status === 'beaten' ? 100 : (g.progress || 0);
+    var cf = g.coop ? rel.friends.filter(function (f) { return f.uid === g.coop; })[0] : null;
+    var cp = cf ? coopMap[cf.uid + '|' + g.title.trim().toLowerCase()] : null;
+    el.innerHTML = '<div class="scr-game" style="--c:' + st.color + '"><div class="scr-art">' + (g.cover ? '<img src="' + esc(g.cover) + '" alt="">' : sprite(g.title)) + '</div>' +
+      '<div class="scr-txt"><b class="scr-t">' + esc(g.title) + '</b><span class="scr-st"><i></i>' + st.label + (g.platform ? ' · ' + esc(g.platform) : '') + '</span>' +
+      '<span class="scr-r"><u>ЧАСОВ</u>' + fmtK(g.hours) + '</span>' +
+      (g.status !== 'wish' ? '<span class="scr-r"><u>ПРОГРЕСС</u>' + p + '%</span><div class="segbar" style="--c:' + st.color + '">' + seg(Math.round(p / 10), 10) + '</div>' : '') +
+      (g.rating > 0 ? '<span class="scr-r"><u>ОЦЕНКА</u>' + '★'.repeat(g.rating) + '</span>' : '') +
+      (cf ? '<span class="scr-r"><u>2P · ' + esc(cf.nick) + '</u>' + (cp != null ? cp + '%' : '—') + '</span>' : '') + '</div></div>';
+  }
+  function shelfOver(e) {
+    if (view.mode !== 'shelf') return;
+    var sp = e.target.closest && e.target.closest('.spine');
+    if (sp) scrShow(sp.getAttribute('data-gid'));
+    else if (e.type === 'mouseout' && !(e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest('.spine'))) scrAttract();
   }
   var shelfBoot = view.mode === 'shelf';
   function shelfNav(e) {
@@ -964,7 +999,7 @@
   }
 
   /* ---------- Beta v2.0: ники, друзья, достижения ---------- */
-  var VERSION = 'Beta v3.1';
+  var VERSION = 'Beta v3.2';
   var NICK_RE = /^[A-Za-z0-9_А-Яа-яЁё]{3,20}$/;
   var me = { nick: '', share: true, avatar: 0, bio: '', fav: '' };
   var rel = { friends: [], incoming: [], outgoing: [] };
@@ -1426,6 +1461,15 @@
       me.bio = bio; me.fav = fav; toast('Профиль сохранён');
     });
     $('#grid').addEventListener('keydown', shelfNav);
+    $('#grid').addEventListener('mouseover', shelfOver);
+    $('#grid').addEventListener('mouseout', shelfOver);
+    $('#grid').addEventListener('focusin', shelfOver);
+    $('#grid').addEventListener('click', function (e) {
+      var d = e.target.closest && e.target.closest('.deck'); if (!d) return;
+      var cb = e.target.closest('#coin');
+      if (cb) { credits = Math.min(99, credits + 1); sfx('coin'); cb.classList.add('hit'); setTimeout(function () { cb.classList.remove('hit'); }, 300); if (!scrId) scrAttract(); }
+      else if (e.target.closest('.btns b, .stick')) sfx('tick');
+    });
     $('#leaf').addEventListener('click', openChangelog);
     $('#cl-close').addEventListener('click', function () { $('#cl').hidden = true; });
     $('#cl').addEventListener('mousedown', function (e) { if (e.target === $('#cl')) $('#cl').hidden = true; });
