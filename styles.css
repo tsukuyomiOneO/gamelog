@@ -528,3 +528,6 @@ html[data-fx="off"] body::after { display: none; }
 .card.ins { animation: cartin 0.7s cubic-bezier(0.3, 0.7, 0.4, 1) both; z-index: 2; }
 .card.eject { animation: carteject 0.44s ease-in both; pointer-events: none; }
 @media (max-width: 520px) { .card { padding: 28px 12px 34px; } .card .pins { left: 10%; right: 10%; } }
+
+/* Beta v2.8: большие числа в окошках статистики */
+.stat dd { overflow: hidden; white-space: nowrap; box-sizing: border-box; min-width: 0; }

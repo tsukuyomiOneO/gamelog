@@ -234,16 +234,24 @@
     var d = document.documentElement;
     return !reduceMotion && d.getAttribute('data-fx') !== 'off';
   }
+  function fitNum(el) {
+    el.style.fontSize = '';
+    if (!el.clientWidth) return;
+    var fs = parseFloat(getComputedStyle(el).fontSize) || 16;
+    while (el.scrollWidth > el.clientWidth + 1 && fs > 8) { fs -= 1; el.style.fontSize = fs + 'px'; }
+  }
+  function fitAll() { var l = document.querySelectorAll('.stat dd'); for (var i = 0; i < l.length; i++) fitNum(l[i]); }
+  window.addEventListener('resize', fitAll);
   function setNum(el, text, delay) {
     if (el._t === text) return;
     var first = el._t === undefined; el._t = text;
     clearInterval(el._i);
-    if (first || !fxOn() || !/^\d+$/.test(text)) { el.textContent = text; return; }
+    if (first || !fxOn() || !/^\d+$/.test(text)) { el.textContent = text; fitNum(el); return; }
     var n = 0, len = text.length;
     el._i = setInterval(function () {
       n++;
       if (n < 9 + delay) el.textContent = String(Math.floor(Math.random() * Math.pow(10, len))).padStart(len, '0');
-      else { clearInterval(el._i); el.textContent = text; }
+      else { clearInterval(el._i); el.textContent = text; fitNum(el); }
     }, 55);
   }
   var luTimer = null;
@@ -738,7 +746,7 @@
   }
 
   /* ---------- Beta v2.0: ники, друзья, достижения ---------- */
-  var VERSION = 'Beta v2.7';
+  var VERSION = 'Beta v2.8';
   var NICK_RE = /^[A-Za-z0-9_А-Яа-яЁё]{3,20}$/;
   var me = { nick: '', share: true, avatar: 0, bio: '', fav: '' };
   var rel = { friends: [], incoming: [], outgoing: [] };
