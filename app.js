@@ -112,6 +112,12 @@
     for (var i = 0; i < total; i++) out += '<i class="' + (i < n ? 'on' : '') + '"></i>';
     return out;
   }
+  function fmtK(h) {
+    h = Number(h) || 0;
+    if (h < 10000) return fmt(h);
+    var u = h >= 1e6 ? 'м' : 'к', v = h >= 1e6 ? h / 1e6 : h / 1e3;
+    return (v >= 100 ? String(Math.round(v)) : v.toFixed(1).replace(/\.0$/, '')) + u;
+  }
   function fmt(h) { h = Number(h) || 0; return Number.isInteger(h) ? String(h) : h.toFixed(1); }
   function toast(msg, kind) {
     var t = $('#toast'); t.className = 'toast' + (kind ? ' ' + kind : ''); t.textContent = msg; t.hidden = false;
@@ -142,7 +148,7 @@
     return {
       id: g.id, user_id: user.id, title: g.title, platform: g.platform || '', genre: g.genre || '',
       status: g.status, progress: Math.max(0, Math.min(100, Math.round(g.progress || 0))),
-      hours: Math.max(0, Math.min(9999, Math.round((Number(g.hours) || 0) * 10) / 10)),
+      hours: Math.max(0, Math.min(99999, Math.round((Number(g.hours) || 0) * 10) / 10)),
       rating: Math.max(0, Math.min(5, Math.round(g.rating || 0))), notes: g.notes || '', cover_path: path || null
     };
   }
@@ -267,7 +273,7 @@
     $('#xp-next').textContent = 'до LVL ' + (p.lvl + 1) + ': ' + (p.hi - p.xp);
     $('#xpbar').innerHTML = seg(Math.round(20 * (p.xp - p.lo) / (p.hi - p.lo)), 20);
     setNum($('#s-games'), String(p.n), 0);
-    setNum($('#s-hours'), fmt(Math.round(p.hours * 10) / 10), 3);
+    setNum($('#s-hours'), fmtK(Math.round(p.hours * 10) / 10), 3);
     setNum($('#s-done'), String(p.beaten), 6);
     $('#s-avg').textContent = p.avg == null ? '—' : p.avg.toFixed(1);
   }
@@ -315,7 +321,7 @@
     }
     h += '<p class="note' + (g.notes ? '' : ' nn') + '">' + (g.notes ? esc(g.notes) : '&nbsp;') + '</p>';
     h += '<div class="foot">' + (g.rating > 0 ? stars(g.rating, 14) : '<span class="meta">Без оценки</span>');
-    h += '<span class="hours">' + (g.status === 'playing' && !ro ? '<button class="plus" type="button" data-act="plus" data-id="' + esc(g.id) + '" aria-label="Добавить час к «' + esc(g.title) + '»">+1 Ч</button>' : '') + fmt(g.hours) + ' Ч</span></div>';
+    h += '<span class="hours">' + (g.status === 'playing' && !ro ? '<button class="plus" type="button" data-act="plus" data-id="' + esc(g.id) + '" aria-label="Добавить час к «' + esc(g.title) + '»">+1 Ч</button>' : '') + fmtK(g.hours) + ' Ч</span></div>';
     h += cardExtra(g, ro);
     return h + '</div><i class="pins" aria-hidden="true"></i></article>';
   }
@@ -715,7 +721,7 @@
       draft.title = title;
       draft.platform = $('#f-platform').value.trim();
       draft.genre = $('#f-genre').value.trim();
-      draft.hours = isFinite(hrs) && hrs > 0 ? Math.min(hrs, 9999) : 0;
+      draft.hours = isFinite(hrs) && hrs > 0 ? Math.min(hrs, 99999) : 0;
       draft.progress = Number($('#f-progress').value) || 0;
       draft.notes = $('#f-notes').value.trim();
       var blob = draft.coverBlob || null, rem = !!draft.coverRemove;
@@ -746,7 +752,7 @@
   }
 
   /* ---------- Beta v2.0: ники, друзья, достижения ---------- */
-  var VERSION = 'Beta v2.8';
+  var VERSION = 'Beta v2.9';
   var NICK_RE = /^[A-Za-z0-9_А-Яа-яЁё]{3,20}$/;
   var me = { nick: '', share: true, avatar: 0, bio: '', fav: '' };
   var rel = { friends: [], incoming: [], outgoing: [] };
@@ -959,7 +965,7 @@
     if (board && board.length > 1) {
       h += '<section class="fsec"><h3>Лидеры среди друзей</h3>';
       board.forEach(function (x, i) {
-        var sub = x.share || x.me ? 'LVL ' + x.lvl + ' · ' + x.hours + ' ч · пройдено ' + x.beaten : 'Коллекция закрыта';
+        var sub = x.share || x.me ? 'LVL ' + x.lvl + ' · ' + fmtK(x.hours) + ' ч · пройдено ' + x.beaten : 'Коллекция закрыта';
         h += '<div class="frow' + (x.me ? ' me' : '') + (i === 0 && x.xp > 0 ? ' top' : '') + '"><span class="fwho"><span class="rk">' + (i === 0 && x.xp > 0 ? '<span class="crown">' + pix(CROWN, 18) + '</span>' : '#' + (i + 1)) + '</span><span class="fav">' + avHtml(x.avatar, 24) + '</span><span class="fname"><span class="fnick">' + esc(x.nick) + (x.me ? ' (ты)' : '') + '</span><span class="fsub">' + esc(sub) + '</span></span></span><span class="hint">' + (x.share || x.me ? x.xp + ' XP' : '—') + '</span></div>';
       });
       h += '</section>';
