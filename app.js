@@ -358,13 +358,18 @@
       return;
     }
     el.className = view.mode === 'shelf' ? 'shelf' : 'grid';
-    el.innerHTML = list.map(view.mode === 'shelf' ? spine : card).join('');
+    var shelfMode = view.mode === 'shelf';
+    el.innerHTML = (shelfMode ? '<div class="marq" aria-hidden="true"><span>★ GAMELOG ★ ВСТАВЬ МОНЕТУ ★ PRESS START ★ ВЫБЕРИ ИГРУ ★ GAMELOG ★ ВСТАВЬ МОНЕТУ ★ PRESS START ★ ВЫБЕРИ ИГРУ </span></div>' : '') + list.map(function (g, i) { return shelfMode ? spine(g, i) : card(g); }).join('');
+    if (shelfMode && shelfBoot && fxOn()) {
+      shelfBoot = false; el.classList.add('boot');
+      setTimeout(function () { el.classList.remove('boot'); }, 700 + list.length * 70);
+    } else if (!shelfMode) shelfBoot = false;
     if (animIn) { animAt[animIn] = Date.now(); animIn = null; }
     for (var k in animAt) {
       var el2 = Date.now() - animAt[k];
       if (el2 > 700) { delete animAt[k]; continue; }
       var ne = cardEl(k);
-      if (ne && fxOn()) { ne.classList.add('ins'); ne.style.animationDelay = (-el2) + 'ms'; }
+      if (ne && fxOn()) { ne.classList.add('ins'); (ne.classList.contains('spine') ? ne.querySelector('.cart') : ne).style.animationDelay = (-el2) + 'ms'; if (ne.classList.contains('spine') && el2 < 60) setTimeout(function () { sfx('click'); }, 420); }
     }
   }
   function render() { renderHud(); renderTabs(); renderGrid(); drawAvatar(); drawStreak(); checkAch(); }
@@ -766,6 +771,7 @@
   var LEAF = ['XXXXXX.', 'X....XX', 'X.XXX.X', 'X.....X', 'X.XXX.X', 'X.....X', 'X.XX..X', 'XXXXXXX'];
   var coopMap = {};
   var RELEASES = [
+    ['Beta v3.1', ['Полка: корпус автомата с бегущей строкой и неоновыми боками', 'Глянец на картриджах, подсветка слотов цветом статуса', 'Вставка картриджа с отскоком и «кликом», выброс на пружине', 'Включение автомата: слоты загораются волной', 'Управление стрелками и курсор ▼, табло с данными при наведении']],
     ['Beta v3.0', ['Звуки 8-бит (включаются в аккаунте)', 'Ежедневный бонус и серия дней подряд', 'Режим «Полка»: отсек автомата, картриджи в слотах', 'Итоги года: картинка со статистикой, можно скачать', 'Совместные игры 2P: отметь друга и сравнивай прогресс', 'Листочек «Что нового» у версии']],
     ['Beta v2.9', ['Лимит часов на игру до 99999', 'Большие числа сокращаются: 10.3к, 1.2м']],
     ['Beta v2.8', ['Окошки статистики подстраиваются под длинные числа']],
@@ -792,6 +798,8 @@
     eject: [[420, 0.08, 'square', 0], [280, 0.1, 'square', 0.08], [160, 0.2, 'sawtooth', 0.17]],
     win: [[523, 0.1, 'square', 0], [659, 0.1, 'square', 0.1], [784, 0.1, 'square', 0.2], [1047, 0.4, 'square', 0.3]],
     lvl: [[392, 0.1, 'square', 0], [523, 0.1, 'square', 0.1], [659, 0.1, 'square', 0.2], [784, 0.1, 'square', 0.3], [1047, 0.2, 'square', 0.4], [1319, 0.45, 'square', 0.6]],
+    tick: [[880, 0.04, 'square', 0]],
+    click: [[200, 0.04, 'square', 0], [100, 0.07, 'sawtooth', 0.04]],
     ach: [[784, 0.08, 'square', 0], [988, 0.08, 'square', 0.08], [1319, 0.3, 'square', 0.16]]
   };
   function sfx(name, force) {
@@ -845,15 +853,30 @@
   }
 
   /* полка */
-  function spine(g) {
+  function spine(g, i) {
     var st = STATUS[g.status] || STATUS.queue, ro = !!viewing;
-    var h = '<button class="spine' + (g.status === 'beaten' ? ' beaten' : '') + '" type="button" data-gid="' + esc(g.id) + '"' + (ro ? '' : ' data-act="edit" data-id="' + esc(g.id) + '"') + ' style="--c:' + st.color + '" title="' + esc(g.title) + ' · ' + st.label + '">';
+    var cf = g.coop ? rel.friends.filter(function (f) { return f.uid === g.coop; })[0] : null;
+    var cp = cf ? coopMap[cf.uid + '|' + g.title.trim().toLowerCase()] : null;
+    var pr = g.status === 'wish' ? '' : ' · ' + (g.status === 'beaten' ? 100 : (g.progress || 0)) + '%';
+    var h = '<button class="spine' + (g.status === 'beaten' ? ' beaten' : '') + '" type="button" data-gid="' + esc(g.id) + '"' + (ro ? '' : ' data-act="edit" data-id="' + esc(g.id) + '"') + ' style="--c:' + st.color + ';--i:' + (i || 0) + '" aria-label="' + esc(g.title) + ', ' + st.label + '">';
     h += '<span class="cart"><span class="c-in"><i class="c-grip"></i>';
     h += '<span class="c-label"><span class="c-cover">' + (g.cover ? '<img src="' + esc(g.cover) + '" alt="">' : sprite(g.title)) + '</span></span>';
     h += '<span class="c-t">' + esc(g.title) + '</span><span class="c-m"><b>' + fmtK(g.hours) + ' Ч</b><em>' + (g.rating > 0 ? '★' + g.rating : '') + '</em></span></span>';
-    h += (g.coop ? '<span class="sp-2p">2P</span>' : '') + '</span>';
+    h += '<i class="c-shine"></i>' + (g.coop ? '<span class="sp-2p">2P</span>' : '') + '</span>';
+    h += '<span class="tip"><b>' + esc(g.title) + '</b>' + esc(st.label) + ' · ' + fmtK(g.hours) + ' Ч' + pr + (g.rating > 0 ? ' · ★' + g.rating : '') + (cf ? '<br>2P ' + esc(cf.nick) + (cp != null ? ': ' + cp + '%' : '') : '') + '</span>';
     h += '<span class="mouth"><i class="led"></i><span>' + esc(st.label) + '</span></span></button>';
     return h;
+  }
+  var shelfBoot = view.mode === 'shelf';
+  function shelfNav(e) {
+    if (view.mode !== 'shelf') return;
+    var k = e.key; if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].indexOf(k) < 0) return;
+    var cur = e.target.closest && e.target.closest('.spine'); if (!cur) return;
+    var list = Array.prototype.slice.call(document.querySelectorAll('#grid .spine')), i = list.indexOf(cur);
+    var cols = 0; list.forEach(function (x) { if (x.offsetTop === list[0].offsetTop) cols++; });
+    var d = k === 'ArrowLeft' ? -1 : k === 'ArrowRight' ? 1 : k === 'ArrowUp' ? -cols : cols;
+    var n = list[i + d]; if (!n) return;
+    e.preventDefault(); n.focus(); sfx('tick');
   }
 
   /* 2P */
@@ -935,13 +958,13 @@
     }, 'image/png');
   }
   function setMode(m) {
-    view.mode = m; try { localStorage.setItem('gamelog.view', m); } catch (e) {}
+    view.mode = m; shelfBoot = m === 'shelf'; try { localStorage.setItem('gamelog.view', m); } catch (e) {}
     $('#vmode').textContent = m === 'shelf' ? 'Карточки' : 'Полка';
     renderGrid();
   }
 
   /* ---------- Beta v2.0: ники, друзья, достижения ---------- */
-  var VERSION = 'Beta v3.0';
+  var VERSION = 'Beta v3.1';
   var NICK_RE = /^[A-Za-z0-9_А-Яа-яЁё]{3,20}$/;
   var me = { nick: '', share: true, avatar: 0, bio: '', fav: '' };
   var rel = { friends: [], incoming: [], outgoing: [] };
@@ -1402,6 +1425,7 @@
       if (r.error) { er.textContent = 'Не удалось сохранить. Попробуй ещё раз.'; er.hidden = false; return; }
       me.bio = bio; me.fav = fav; toast('Профиль сохранён');
     });
+    $('#grid').addEventListener('keydown', shelfNav);
     $('#leaf').addEventListener('click', openChangelog);
     $('#cl-close').addEventListener('click', function () { $('#cl').hidden = true; });
     $('#cl').addEventListener('mousedown', function (e) { if (e.target === $('#cl')) $('#cl').hidden = true; });

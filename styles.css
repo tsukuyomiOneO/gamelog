@@ -549,10 +549,21 @@ html[data-fx="off"] body::after { display: none; }
   box-shadow: 0 0 0 3px #000, inset 0 0 40px rgba(0, 0, 0, 0.8), 0 0 24px rgba(255, 176, 0, 0.25);
   outline: 5px dotted var(--bulb, #ffb000); outline-offset: 5px;
 }
-.shelf::before {
-  content: '▶ ВЫБЕРИ ИГРУ ◀'; grid-column: 1 / -1; text-align: center; font: 400 14px/1 var(--f-display); letter-spacing: 3px; color: var(--star);
-  background: #000; border: 3px solid var(--faint); padding: 10px; text-shadow: 0 0 10px var(--star); animation: pulse 1.6s steps(2) infinite;
+.shelf {
+  background:
+    radial-gradient(circle at 12px 12px, #bbb 3px, #555 4px, transparent 5px), radial-gradient(circle at calc(100% - 12px) 12px, #bbb 3px, #555 4px, transparent 5px),
+    radial-gradient(circle at 12px calc(100% - 12px), #bbb 3px, #555 4px, transparent 5px), radial-gradient(circle at calc(100% - 12px) calc(100% - 12px), #bbb 3px, #555 4px, transparent 5px),
+    linear-gradient(180deg, #1a0710, #0d0307);
+  box-shadow: 0 0 0 3px #000, inset 12px 0 18px -8px #ff2e63, inset -12px 0 18px -8px #5cf2ff, inset 0 0 40px rgba(0, 0, 0, 0.8), 0 0 24px rgba(255, 176, 0, 0.25);
+  padding: 22px 24px 40px;
 }
+.shelf::after {
+  content: ''; grid-column: 1 / -1; height: 14px; margin: 6px 30% 0;
+  background: radial-gradient(circle, #000 2px, #3a1a0e 3px, transparent 4px) 0 0 / 10px 14px;
+}
+.marq { grid-column: 1 / -1; overflow: hidden; background: #000; border: 3px solid var(--faint); box-shadow: inset 0 0 12px rgba(255, 210, 63, 0.25); padding: 10px 0; white-space: nowrap; }
+.marq span { display: inline-block; font: 400 13px/1 var(--f-display); letter-spacing: 3px; color: var(--star); text-shadow: 0 0 10px var(--star); animation: marq 22s linear infinite; }
+@keyframes marq { to { transform: translateX(-50%); } }
 .shelf > .panel { grid-column: 1 / -1; }
 .spine { position: relative; height: 226px; padding: 0; background: none; border: 0; color: var(--ink); font: inherit; text-align: center; display: block; }
 .spine .cart {
@@ -595,3 +606,37 @@ html[data-fx="off"] body::after { display: none; }
   .spine .cart { height: 218px; }
   #add { flex: 1 1 100%; }
 }
+
+/* Beta v3.1: полка — глянец, подсветка слотов, табло, анимации */
+.spine { perspective: 500px; background: radial-gradient(ellipse at 50% 100%, color-mix(in srgb, var(--c) 40%, transparent), transparent 70%); }
+.spine.beaten { background: radial-gradient(ellipse at 50% 100%, rgba(255, 210, 63, 0.5), transparent 70%); }
+.spine:hover .cart, .spine:focus-visible .cart { transform: translateY(-12px) rotateX(-5deg); }
+.c-shine { position: absolute; top: 0; bottom: 0; left: -60%; width: 40%; background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.35), transparent); transform: skewX(-18deg); pointer-events: none; }
+.spine:hover .c-shine, .spine:focus-visible .c-shine { animation: shineSweep 0.7s ease-out; }
+@keyframes shineSweep { to { left: 130%; } }
+.spine:focus-visible { outline: none; }
+.spine:focus-visible .mouth { border-color: var(--star); box-shadow: inset 0 6px 8px rgba(0, 0, 0, 0.9), 0 0 12px var(--star); }
+.spine::after { content: '▼'; position: absolute; top: -12px; left: 50%; transform: translateX(-50%); color: var(--star); font-size: 12px; text-shadow: 0 0 8px var(--star); opacity: 0; pointer-events: none; }
+.spine:hover::after, .spine:focus-visible::after { opacity: 1; animation: pulse 0.6s steps(2) infinite; }
+.tip {
+  position: absolute; left: 4%; right: 4%; top: 28px; z-index: 4; padding: 8px 6px; background: #000; border: 3px solid var(--star); color: var(--star);
+  font: 700 10px/1.5 var(--f-body); text-transform: uppercase; letter-spacing: 0.3px; text-shadow: 0 0 6px var(--star);
+  opacity: 0; pointer-events: none; transform: translateY(6px); transition: opacity 0.12s steps(2), transform 0.12s steps(2);
+}
+.tip b { display: block; font: 600 12px/1.2 var(--f-pixel); color: #fff; text-shadow: none; margin-bottom: 4px; overflow-wrap: anywhere; text-transform: none; }
+@media (hover: hover) { .spine:hover .tip, .spine:focus-visible .tip { opacity: 1; transform: none; } }
+/* вставка и выброс: двигается сам картридж, слот на месте */
+.spine.ins, .spine.eject { animation: none; }
+.spine.ins .cart { animation: cartDrop 0.7s cubic-bezier(0.3, 0.7, 0.4, 1) both; }
+.spine.ins .mouth { animation: mouthFlash 0.7s ease-out; }
+.spine.eject .cart { animation: springUp 0.44s ease-in both; }
+@keyframes cartDrop { 0% { transform: translateY(-170px); opacity: 0; } 20% { opacity: 1; } 62% { transform: translateY(10px); } 80% { transform: translateY(-4px); } 100% { transform: none; } }
+@keyframes mouthFlash { 0%, 55% { box-shadow: inset 0 6px 8px rgba(0, 0, 0, 0.9); } 62% { box-shadow: inset 0 6px 8px rgba(0, 0, 0, 0.9), 0 0 24px var(--c), 0 0 6px #fff; } 100% { box-shadow: inset 0 6px 8px rgba(0, 0, 0, 0.9); } }
+@keyframes springUp { 0% { transform: none; opacity: 1; } 18% { transform: translateY(10px); } 100% { transform: translateY(-190px) rotate(-6deg); opacity: 0; } }
+/* включение автомата: слоты загораются волной */
+.shelf.boot .spine { animation: slotOn 0.6s steps(6) both; animation-delay: calc(var(--i) * 70ms); }
+@keyframes slotOn { 0% { opacity: 0.08; filter: brightness(0.3); } 60% { opacity: 1; filter: brightness(2); } 100% { opacity: 1; filter: none; } }
+.shelf.boot .marq span { animation: blink 0.3s steps(2) 4, marq 22s linear infinite; }
+:root[data-fx="off"] .marq span, :root[data-fx="off"] .shelf.boot .spine { animation: none; }
+@media (prefers-reduced-motion: reduce) { .marq span, .shelf.boot .spine { animation: none; } }
+@media (max-width: 520px) { .shelf { padding: 18px 14px 34px; } .tip { top: 20px; } }
