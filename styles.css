@@ -531,3 +531,41 @@ html[data-fx="off"] body::after { display: none; }
 
 /* Beta v2.8: большие числа в окошках статистики */
 .stat dd { overflow: hidden; white-space: nowrap; box-sizing: border-box; min-width: 0; }
+
+/* Beta v3.0 */
+.ver-row { display: inline-flex; align-items: center; gap: 8px; }
+.leaf { display: inline-grid; place-items: center; width: 22px; height: 22px; padding: 0; background: var(--field); border: 2px solid var(--star); color: var(--star); box-shadow: 0 0 8px rgba(255, 210, 63, 0.5); }
+.leaf:hover { background: var(--star); color: #1a0710; }
+.streak { display: inline-flex; align-items: center; gap: 4px; color: #ff9d00; font: 700 12px/1 var(--f-body); border: 2px solid #ff9d00; padding: 3px 6px; background: #000; text-shadow: 0 0 6px #ff9d00; }
+.streak[hidden] { display: none; }
+.badge.coop { border-color: #5cf2ff; color: #5cf2ff; text-transform: none; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.cl-l { margin: 6px 0 0; padding-left: 18px; color: var(--dim); font-size: 14px; display: flex; flex-direction: column; gap: 4px; }
+#yr-cv { width: 100%; height: auto; border: 3px solid var(--line); display: block; margin-bottom: 12px; }
+
+/* полка */
+.shelf {
+  --rh: 246px; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 36px 12px; padding: 8px 12px 0;
+  background: repeating-linear-gradient(180deg, transparent 0 calc(var(--rh) - 50px), #3a1a0e calc(var(--rh) - 50px) calc(var(--rh) - 36px), #1a0710 calc(var(--rh) - 36px) var(--rh));
+  background-position: 0 8px; background-size: 100% var(--rh); background-repeat: repeat-y;
+}
+.shelf > .panel { width: 100%; }
+.spine {
+  position: relative; width: var(--w, 54px); height: 210px; padding: 18px 4px 14px; display: flex; flex-direction: column; align-items: center; gap: 6px;
+  background: linear-gradient(90deg, #2b0c18, #4a1428 60%, #2b0c18); border: 3px solid var(--c, var(--line)); border-bottom-width: 5px; color: var(--ink);
+  transition: transform 0.15s steps(3); font: inherit;
+}
+.spine:hover, .spine:focus-visible { transform: translateY(-16px); z-index: 3; }
+.spine:disabled { cursor: default; }
+.sp-top { position: absolute; left: 0; right: 0; top: 0; height: 10px; background: repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.55) 0 3px, rgba(255, 255, 255, 0.08) 3px 6px); border-bottom: 2px solid var(--c); }
+.sp-cover { width: 100%; aspect-ratio: 3 / 4; border: 2px solid var(--line); overflow: hidden; background: var(--surface2); flex: none; }
+.sp-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.sp-cover svg { width: 100%; height: 100%; padding: 3px; }
+.sp-t { writing-mode: vertical-rl; font: 600 13px/1.1 var(--f-pixel); flex: 1; min-height: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-height: 100%; }
+.sp-h { font: 700 9px/1 var(--f-body); color: var(--star); }
+.sp-pins { position: absolute; left: 20%; right: 20%; bottom: 2px; height: 4px; background: repeating-linear-gradient(90deg, var(--star) 0 2px, #1a0710 2px 4px); }
+.sp-2p { position: absolute; top: 12px; right: -3px; background: #5cf2ff; color: #001a1f; font: 700 8px/1 var(--f-body); padding: 2px 3px; z-index: 1; }
+.spine.beaten { box-shadow: 0 0 12px rgba(255, 210, 63, 0.6); border-color: var(--star); }
+.spine.ins { animation: cartin 0.7s cubic-bezier(0.3, 0.7, 0.4, 1) both; z-index: 2; }
+.spine.eject { animation: carteject 0.44s ease-in both; pointer-events: none; }
+@media (max-width: 520px) { .shelf { --rh: 226px; gap: 36px 8px; } .spine { height: 190px; } }
+@media (prefers-reduced-motion: reduce) { .spine { transition: none; } }

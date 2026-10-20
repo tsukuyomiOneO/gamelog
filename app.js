@@ -53,7 +53,8 @@
   var loaded = false;
   var recovering = false;
   var chains = {};
-  var view = { tab: 'all', q: '', sort: 'updated' };
+  var view = { tab: 'all', q: '', sort: 'updated', mode: 'cards' };
+  try { if (localStorage.getItem('gamelog.view') === 'shelf') view.mode = 'shelf'; } catch (e) {}
   var draft = null;
   var opener = null;
   var toastTimer = null;
@@ -141,7 +142,7 @@
       id: r.id, title: r.title, platform: r.platform || '', genre: r.genre || '', status: r.status,
       progress: r.progress || 0, hours: Number(r.hours) || 0, rating: r.rating || 0, notes: r.notes || '',
       cover_path: r.cover_path || null, cover: coverUrl(r.cover_path, r.updated_at),
-      updated: Date.parse(r.updated_at) || 0, added: Date.parse(r.created_at) || 0
+      updated: Date.parse(r.updated_at) || 0, added: Date.parse(r.created_at) || 0, coop: r.coop_with || null
     };
   }
   function toRow(g, path) {
@@ -149,7 +150,7 @@
       id: g.id, user_id: user.id, title: g.title, platform: g.platform || '', genre: g.genre || '',
       status: g.status, progress: Math.max(0, Math.min(100, Math.round(g.progress || 0))),
       hours: Math.max(0, Math.min(99999, Math.round((Number(g.hours) || 0) * 10) / 10)),
-      rating: Math.max(0, Math.min(5, Math.round(g.rating || 0))), notes: g.notes || '', cover_path: path || null
+      rating: Math.max(0, Math.min(5, Math.round(g.rating || 0))), notes: g.notes || '', cover_path: path || null, coop_with: g.coop || null
     };
   }
   function queue(id, fn) {
@@ -166,7 +167,7 @@
   function saveGame(g, blob, removeCover) {
     g.updated = Date.now(); if (!g.added) g.added = g.updated;
     var i = games.findIndex(function (x) { return x.id === g.id; });
-    if (i >= 0) games[i] = g; else { games.push(g); animIn = g.id; }
+    if (i >= 0) { if (g.status === 'beaten' && games[i].status !== 'beaten') sfx('win'); games[i] = g; } else { games.push(g); animIn = g.id; sfx(g.status === 'beaten' ? 'win' : 'coin'); }
     render();
     var snap = Object.assign({}, g);
     return queue(snap.id, async function () {
@@ -191,6 +192,7 @@
   }
   function removeGame(id) {
     var g = games.find(function (x) { return x.id === id; });
+    sfx('eject');
     var ce = fxOn() ? cardEl(id) : null;
     if (ce) {
       ce.classList.add('eject');
@@ -212,7 +214,7 @@
       hours += Number(g.hours) || 0;
       if (g.rating > 0) { rs += g.rating; rn++; }
     });
-    var xp = beaten * 120 + Math.round(hours) * 3 + playing * 15;
+    var xp = beaten * 120 + Math.round(hours) * 3 + playing * 15 + (viewing ? 0 : bonusXp());
     var lvl = 1 + Math.floor(Math.sqrt(xp / 60));
     var lo = (lvl - 1) * (lvl - 1) * 60, hi = lvl * lvl * 60;
     return { n: games.length, hours: hours, beaten: beaten, avg: rn ? rs / rn : null, xp: xp, lvl: lvl, lo: lo, hi: hi };
@@ -263,6 +265,7 @@
   var luTimer = null;
   function showLevelUp(n) {
     var el = $('#lvlup'); $('#lu-n').textContent = 'LVL ' + n; el.hidden = false;
+    sfx('lvl');
     clearTimeout(luTimer); luTimer = setTimeout(function () { el.hidden = true; }, 2600);
   }
   function renderHud() {
@@ -313,9 +316,11 @@
     h += '<button class="head" type="button"' + ed + (ro ? ' disabled' : '') + ' aria-label="' + (ro ? '' : 'Изменить: ') + esc(g.title) + '">';
     h += '<span class="ht"><span class="title">' + esc(g.title) + '</span>';
     h += '<span class="meta">' + esc(g.platform || 'Платформа не указана') + '</span></span></button>';
-    h += '<div class="badges"><span class="badge"><i></i>' + st.label + '</span>' + (g.genre ? '<span class="badge plain">' + esc(g.genre) + '</span>' : '') + '</div>';
+    var cf = g.coop ? rel.friends.filter(function (f) { return f.uid === g.coop; })[0] : null;
+    h += '<div class="badges"><span class="badge"><i></i>' + st.label + '</span>' + (cf ? '<span class="badge coop">2P · ' + esc(cf.nick) + '</span>' : '') + (g.genre ? '<span class="badge plain">' + esc(g.genre) + '</span>' : '') + '</div>';
     if (g.status !== 'wish') {
-      h += '<div class="prog"><div class="prog-l"><span>Прогресс</span><span>' + (g.status === 'beaten' ? 100 : (g.progress || 0)) + '%</span></div><div class="segbar" style="--c:' + st.color + '">' + seg(segs, 10) + '</div></div>';
+      var cp = cf ? coopMap[cf.uid + '|' + g.title.trim().toLowerCase()] : null;
+      h += '<div class="prog"><div class="prog-l"><span>Прогресс</span><span>' + (g.status === 'beaten' ? 100 : (g.progress || 0)) + '%' + (cp ? ' · ' + esc(cf.nick) + ' ' + cp + '%' : '') + '</span></div><div class="segbar" style="--c:' + st.color + '">' + seg(segs, 10) + '</div></div>';
     } else {
       h += '<div class="prog ph" aria-hidden="true"><div class="prog-l"><span>&nbsp;</span></div><div class="segbar"></div></div>';
     }
@@ -327,7 +332,7 @@
   }
   var animIn = null, animAt = {};
   function cardEl(id) {
-    var l = document.querySelectorAll('#grid .card');
+    var l = document.querySelectorAll('#grid [data-gid]');
     for (var i = 0; i < l.length; i++) if (l[i].getAttribute('data-gid') === id) return l[i];
     return null;
   }
@@ -352,7 +357,8 @@
       el.innerHTML = '<div class="panel empty" style="grid-column:1/-1"><h2>Ничего не найдено</h2><p>В этом разделе нет игр по такому запросу. Смени вкладку или очисти поиск.</p></div>';
       return;
     }
-    el.innerHTML = list.map(card).join('');
+    el.className = view.mode === 'shelf' ? 'shelf' : 'grid';
+    el.innerHTML = list.map(view.mode === 'shelf' ? spine : card).join('');
     if (animIn) { animAt[animIn] = Date.now(); animIn = null; }
     for (var k in animAt) {
       var el2 = Date.now() - animAt[k];
@@ -361,7 +367,7 @@
       if (ne && fxOn()) { ne.classList.add('ins'); ne.style.animationDelay = (-el2) + 'ms'; }
     }
   }
-  function render() { renderHud(); renderTabs(); renderGrid(); drawAvatar(); checkAch(); }
+  function render() { renderHud(); renderTabs(); renderGrid(); drawAvatar(); drawStreak(); checkAch(); }
 
   /* ---------- окно игры ---------- */
   function drawSeg() {
@@ -422,6 +428,7 @@
     $('#f-progress').value = draft.progress || 0;
     $('#f-pv').textContent = (draft.progress || 0) + '%';
     $('#f-notes').value = draft.notes || '';
+    fillCoop();
     $('#f-err').hidden = true;
     $('#f-del').hidden = !g;
     $('#f-save').disabled = false;
@@ -550,6 +557,7 @@
     $('#acc-nick').value = me.nick; $('#acc-nick-err').hidden = true; $('#acc-share').checked = me.share;
     $('#acc-bio').value = me.bio; $('#acc-fav').value = me.fav; $('#acc-prof-err').hidden = true; drawAvPicker();
     $('#acc-ver').textContent = 'GameLOG ' + VERSION;
+    $('#acc-snd').checked = sndOn();
     $('#acc-fx').checked = document.documentElement.getAttribute('data-fx') !== 'off';
     $('#acc').hidden = false;
     var d = $('#acc-del'); d.classList.remove('armed'); d.textContent = 'Удалить аккаунт';
@@ -589,7 +597,7 @@
     $('#boot').hidden = true;
     if (!u) {
       games = []; loaded = false;
-      viewing = null; mine = null; socialLoaded = false; rel = { friends: [], incoming: [], outgoing: [] }; me = { nick: '', share: true, avatar: 0, bio: '', fav: '' };
+      dailyDone = false; streakCache = null; coopMap = {}; viewing = null; mine = null; socialLoaded = false; rel = { friends: [], incoming: [], outgoing: [] }; me = { nick: '', share: true, avatar: 0, bio: '', fav: '' };
       recs = []; board = null; rx = { cnt: {}, mine: {} };
       setViewing(); $('#fr').hidden = true; $('#aw').hidden = true; $('#rec').hidden = true; $('#cmp').hidden = true;
       $('#app').hidden = true; $('#acc').hidden = true; $('#ov').hidden = true;
@@ -672,6 +680,7 @@
       if (!$('#ov').hidden) closeModal(); else if (!$('#acc').hidden) $('#acc').hidden = true;
       else if (!$('#rec').hidden) $('#rec').hidden = true; else if (!$('#cmp').hidden) $('#cmp').hidden = true;
       else if (!$('#fr').hidden) $('#fr').hidden = true; else if (!$('#aw').hidden) $('#aw').hidden = true;
+      else if (!$('#cl').hidden) $('#cl').hidden = true; else if (!$('#yr').hidden) $('#yr').hidden = true;
     });
     $('#f-status').addEventListener('click', function (e) {
       var b = e.target.closest('[data-st]'); if (!b) return;
@@ -724,6 +733,7 @@
       draft.hours = isFinite(hrs) && hrs > 0 ? Math.min(hrs, 99999) : 0;
       draft.progress = Number($('#f-progress').value) || 0;
       draft.notes = $('#f-notes').value.trim();
+      draft.coop = $('#f-coop').value || null;
       var blob = draft.coverBlob || null, rem = !!draft.coverRemove;
       var g = draft;
       delete g.coverBlob; delete g.coverBlobUrl; delete g.coverRemove;
@@ -751,8 +761,185 @@
     });
   }
 
+
+  /* ---------- Beta v3.0: звуки, серия, полка, итоги года, 2P, что нового ---------- */
+  var LEAF = ['XXXXXX.', 'X....XX', 'X.XXX.X', 'X.....X', 'X.XXX.X', 'X.....X', 'X.XX..X', 'XXXXXXX'];
+  var coopMap = {};
+  var RELEASES = [
+    ['Beta v3.0', ['Звуки 8-бит (включаются в аккаунте)', 'Ежедневный бонус и серия дней подряд', 'Режим «Полка»: игры стоят корешками картриджей', 'Итоги года: картинка со статистикой, можно скачать', 'Совместные игры 2P: отметь друга и сравнивай прогресс', 'Листочек «Что нового» у версии']],
+    ['Beta v2.9', ['Лимит часов на игру до 99999', 'Большие числа сокращаются: 10.3к, 1.2м']],
+    ['Beta v2.8', ['Окошки статистики подстраиваются под длинные числа']],
+    ['Beta v2.7', ['Карточки-картриджи', 'Анимации вставки и извлечения игры']],
+    ['Beta v2.6', ['Починено редактирование профиля', 'Новая иконка друзей', 'Карточки одинакового размера']],
+    ['Beta v2.5', ['Единый дизайн «Аркада», без переключателя тем']],
+    ['Beta v2.4', ['Аркадный стиль: неон, лампочки, барабаны, LEVEL UP']],
+    ['Beta v2.2', ['Сравнение коллекций, рекомендации игр, реакции, рейтинг друзей']],
+    ['Beta v2.1', ['Аватары и профиль: «О себе», «Любимая игра»']],
+    ['Beta v2.0', ['Достижения', 'Уникальные ники', 'Друзья и общий просмотр коллекций']]
+  ];
+  function openChangelog() {
+    $('#cl-body').innerHTML = RELEASES.map(function (r, i) {
+      return '<section class="fsec"><h3>' + esc(r[0]) + (i === 0 ? ' · сейчас' : '') + '</h3><ul class="cl-l">' + r[1].map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('') + '</ul></section>';
+    }).join('');
+    $('#cl').hidden = false;
+  }
+
+  /* звуки */
+  var audioCtx = null;
+  function sndOn() { try { return localStorage.getItem('gamelog.snd') === 'on'; } catch (e) { return false; } }
+  var SFX = {
+    coin: [[988, 0.07, 'square', 0], [1319, 0.28, 'square', 0.07]],
+    eject: [[420, 0.08, 'square', 0], [280, 0.1, 'square', 0.08], [160, 0.2, 'sawtooth', 0.17]],
+    win: [[523, 0.1, 'square', 0], [659, 0.1, 'square', 0.1], [784, 0.1, 'square', 0.2], [1047, 0.4, 'square', 0.3]],
+    lvl: [[392, 0.1, 'square', 0], [523, 0.1, 'square', 0.1], [659, 0.1, 'square', 0.2], [784, 0.1, 'square', 0.3], [1047, 0.2, 'square', 0.4], [1319, 0.45, 'square', 0.6]],
+    ach: [[784, 0.08, 'square', 0], [988, 0.08, 'square', 0.08], [1319, 0.3, 'square', 0.16]]
+  };
+  function sfx(name, force) {
+    if (!force && !sndOn()) return;
+    try {
+      var C = window.AudioContext || window.webkitAudioContext; if (!C) return;
+      audioCtx = audioCtx || new C();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      var t = audioCtx.currentTime;
+      (SFX[name] || []).forEach(function (n) {
+        var o = audioCtx.createOscillator(), g = audioCtx.createGain(), at = t + n[3];
+        o.type = n[2]; o.frequency.setValueAtTime(n[0], at);
+        g.gain.setValueAtTime(0.0001, at); g.gain.exponentialRampToValueAtTime(0.07, at + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, at + n[1]);
+        o.connect(g); g.connect(audioCtx.destination); o.start(at); o.stop(at + n[1] + 0.03);
+      });
+    } catch (e) {}
+  }
+
+  /* ежедневный бонус и серия */
+  var streakCache = null;
+  function dayStr(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function streakGet() {
+    if (!user) return { last: '', n: 0, bonus: 0 };
+    if (streakCache && streakCache.uid === user.id) return streakCache;
+    var v = { last: '', n: 0, bonus: 0 };
+    try { var p = JSON.parse(localStorage.getItem('gamelog.streak.' + user.id) || 'null'); if (p) v = { last: String(p.last || ''), n: Number(p.n) || 0, bonus: Number(p.bonus) || 0 }; } catch (e) {}
+    v.uid = user.id; streakCache = v; return v;
+  }
+  function bonusXp() { return streakGet().bonus; }
+  var dailyDone = false;
+  function dailyCheck() {
+    if (dailyDone || viewing || !user || !loaded) return;
+    dailyDone = true;
+    var s = streakGet(), now = new Date(), today = dayStr(now);
+    if (s.last === today) return;
+    var y = new Date(now.getTime() - 86400000);
+    s.n = s.last === dayStr(y) ? s.n + 1 : 1;
+    var gain = 10 * Math.min(s.n, 7);
+    s.bonus += gain; s.last = today;
+    try { localStorage.setItem('gamelog.streak.' + user.id, JSON.stringify({ last: s.last, n: s.n, bonus: s.bonus })); } catch (e) {}
+    sfx('coin');
+    toast('День ' + s.n + ' подряд: +' + gain + ' XP', 'ach');
+    renderHud(); drawStreak();
+  }
+  function drawStreak() {
+    var el = $('#streak'); if (!el) return;
+    var s = streakGet();
+    el.hidden = !!viewing || s.n < 1;
+    el.innerHTML = pix(FLAME, 12) + '<b>' + s.n + '</b>';
+    el.title = 'Серия: ' + s.n + ' дн. подряд. Заходи каждый день за бонусом XP';
+  }
+
+  /* полка */
+  function spine(g) {
+    var st = STATUS[g.status] || STATUS.queue, ro = !!viewing, w = 46 + (hash(g.title) % 3) * 8;
+    var h = '<button class="spine' + (g.status === 'beaten' ? ' beaten' : '') + '" type="button" data-gid="' + esc(g.id) + '"' + (ro ? '' : ' data-act="edit" data-id="' + esc(g.id) + '"') + ' style="--c:' + st.color + ';--w:' + w + 'px" title="' + esc(g.title) + ' · ' + st.label + '">';
+    h += '<i class="sp-top"></i>' + (g.coop ? '<span class="sp-2p">2P</span>' : '');
+    h += '<span class="sp-cover">' + (g.cover ? '<img src="' + esc(g.cover) + '" alt="">' : sprite(g.title)) + '</span>';
+    h += '<span class="sp-t">' + esc(g.title) + '</span><span class="sp-h">' + fmtK(g.hours) + 'Ч</span><i class="sp-pins"></i></button>';
+    return h;
+  }
+
+  /* 2P */
+  function fillCoop() {
+    var sel = $('#f-coop'), cur = draft && draft.coop || '';
+    var opts = '<option value="">Один</option>';
+    var seen = false;
+    rel.friends.forEach(function (f) { if (f.uid === cur) seen = true; opts += '<option value="' + esc(f.uid) + '">' + esc(f.nick) + '</option>'; });
+    if (cur && !seen) opts += '<option value="' + esc(cur) + '">Бывший друг</option>';
+    sel.innerHTML = opts; sel.value = cur;
+    $('#f-coop-l').hidden = !rel.friends.length && !cur;
+  }
+  async function loadCoop() {
+    if (!user || viewing) return;
+    var ids = [];
+    games.forEach(function (g) { if (g.coop && ids.indexOf(g.coop) < 0) ids.push(g.coop); });
+    if (!ids.length) { coopMap = {}; return; }
+    var r = await sb.from('games').select('title,progress,status,user_id').in('user_id', ids).limit(1000);
+    if (r.error || viewing) return;
+    var m = {};
+    r.data.forEach(function (x) { m[x.user_id + '|' + String(x.title).trim().toLowerCase()] = x.status === 'beaten' ? 100 : (x.progress || 0); });
+    coopMap = m; renderGrid();
+  }
+
+  /* итоги года */
+  function wrapTop(list, key) {
+    var c = {}; list.forEach(function (g) { var k = (g[key] || '').trim(); if (k) c[k] = (c[k] || 0) + 1; });
+    var best = '', n = 0; Object.keys(c).forEach(function (k) { if (c[k] > n) { n = c[k]; best = k; } });
+    return best || '—';
+  }
+  async function openYear() {
+    if (!games.length) return toast('Добавь хотя бы одну игру');
+    var yr = new Date().getFullYear(), p = profile();
+    var beatY = games.filter(function (g) { return g.status === 'beaten' && new Date(g.updated).getFullYear() === yr; }).length;
+    var addY = games.filter(function (g) { return g.added && new Date(g.added).getFullYear() === yr; }).length;
+    var best = games.slice().sort(function (a, b) { return (b.rating || 0) - (a.rating || 0) || (b.hours || 0) - (a.hours || 0); })[0];
+    try { await document.fonts.ready; } catch (e) {}
+    var cv = $('#yr-cv'), c = cv.getContext('2d'), W = cv.width, H = cv.height;
+    var fd = getComputedStyle(document.body).getPropertyValue('--f-display').trim() || 'monospace';
+    var fb = getComputedStyle(document.body).getPropertyValue('--f-body').trim() || 'monospace';
+    var gr = c.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#14050c'); gr.addColorStop(1, '#3d0f22');
+    c.fillStyle = gr; c.fillRect(0, 0, W, H);
+    c.fillStyle = 'rgba(0,0,0,0.18)'; for (var y = 0; y < H; y += 4) c.fillRect(0, y, W, 2);
+    c.strokeStyle = '#ffd23f'; c.lineWidth = 8; c.strokeRect(40, 40, W - 80, H - 80);
+    c.fillStyle = '#ffb000'; for (var x = 56; x < W - 50; x += 28) { c.beginPath(); c.arc(x, 56, 4, 0, 7); c.arc(x, H - 56, 4, 0, 7); c.fill(); }
+    function px(map, x0, y0, sz, col) { c.fillStyle = col; map.forEach(function (row, j) { for (var i = 0; i < row.length; i++) if (row[i] === 'X') c.fillRect(x0 + i * sz, y0 + j * sz, sz, sz); }); }
+    px(HEART, 90, 100, 10, '#ff3b5c');
+    c.textBaseline = 'alphabetic'; c.fillStyle = '#ffd23f'; c.shadowColor = '#ff9d00'; c.shadowBlur = 24;
+    c.font = '64px ' + fd; c.fillText('GameLOG', 200, 160);
+    c.font = '110px ' + fd; c.fillText('ИТОГИ ' + yr, 90, 330);
+    c.shadowBlur = 0;
+    c.font = '38px ' + fb; c.fillStyle = '#ffe9b0'; c.fillText(me.nick || 'Игрок', 90, 400);
+    c.fillStyle = '#9b7b6a'; c.font = '30px ' + fb; c.fillText('LVL ' + p.lvl + ' · ' + RANKS[Math.min(p.lvl - 1, RANKS.length - 1)], 90, 448);
+    var cells = [['ИГР', String(p.n)], ['ЧАСОВ', fmtK(Math.round(p.hours * 10) / 10)], ['ПРОЙДЕНО В ' + yr, String(beatY)], ['СР. ОЦЕНКА', p.avg == null ? '—' : p.avg.toFixed(1)]];
+    cells.forEach(function (it, i) {
+      var cx = 90 + (i % 2) * 460, cy = 500 + Math.floor(i / 2) * 230;
+      c.fillStyle = '#000'; c.fillRect(cx, cy, 420, 190); c.strokeStyle = '#6b4a2a'; c.lineWidth = 4; c.strokeRect(cx, cy, 420, 190);
+      c.fillStyle = '#ffd23f'; c.shadowColor = '#ffb000'; c.shadowBlur = 16;
+      var f = 84; c.font = f + 'px ' + fd; while (c.measureText(it[1]).width > 380 && f > 24) { f -= 4; c.font = f + 'px ' + fd; }
+      c.fillText(it[1], cx + 20, cy + 100); c.shadowBlur = 0;
+      c.fillStyle = '#ffe9b0'; c.font = '28px ' + fb; c.fillText(it[0], cx + 20, cy + 160);
+    });
+    var lines = [['Любимый жанр', wrapTop(games, 'genre')], ['Любимая платформа', wrapTop(games, 'platform')], ['Лучшая игра', best ? best.title : '—'], ['Добавлено в ' + yr, String(addY)]];
+    lines.forEach(function (l, i) {
+      var ly = 1010 + i * 62;
+      c.fillStyle = '#9b7b6a'; c.font = '28px ' + fb; c.fillText(l[0], 90, ly);
+      c.fillStyle = '#ffe9b0'; c.font = '34px ' + fb; var t = l[1]; while (c.measureText(t).width > 460 && t.length > 4) t = t.slice(0, -2); if (t !== l[1]) t += '…';
+      c.textAlign = 'right'; c.fillText(t, W - 90, ly); c.textAlign = 'left';
+    });
+    c.fillStyle = '#ff3b5c'; c.font = '26px ' + fd; c.textAlign = 'center'; c.fillText('gamelog-orcin.vercel.app', W / 2, H - 80); c.textAlign = 'left';
+    $('#yr').hidden = false;
+  }
+  function saveYear() {
+    $('#yr-cv').toBlob(function (b) {
+      if (!b) return;
+      var u = URL.createObjectURL(b), a = document.createElement('a');
+      a.href = u; a.download = 'gamelog-' + new Date().getFullYear() + '.png';
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(u); }, 2000);
+    }, 'image/png');
+  }
+  function setMode(m) {
+    view.mode = m; try { localStorage.setItem('gamelog.view', m); } catch (e) {}
+    $('#vmode').textContent = m === 'shelf' ? 'Карточки' : 'Полка';
+    renderGrid();
+  }
+
   /* ---------- Beta v2.0: ники, друзья, достижения ---------- */
-  var VERSION = 'Beta v2.9';
+  var VERSION = 'Beta v3.0';
   var NICK_RE = /^[A-Za-z0-9_А-Яа-яЁё]{3,20}$/;
   var me = { nick: '', share: true, avatar: 0, bio: '', fav: '' };
   var rel = { friends: [], incoming: [], outgoing: [] };
@@ -835,6 +1022,7 @@
   }
   function checkAch() {
     if (viewing || !loaded || !user || !socialLoaded) return;
+    dailyCheck();
     var pr = profile(), lk = 'gamelog.lvl.' + user.id, pl = NaN;
     try { pl = parseInt(localStorage.getItem(lk), 10); } catch (e) {}
     if (!isNaN(pl) && pr.lvl > pl) showLevelUp(pr.lvl);
@@ -844,7 +1032,7 @@
     try { prev = JSON.parse(localStorage.getItem(key) || 'null'); } catch (e) {}
     if (Array.isArray(prev)) {
       var fresh = ACH.filter(function (a) { return done.indexOf(a.id) >= 0 && prev.indexOf(a.id) < 0; });
-      if (fresh.length) toast('Достижение: ' + fresh.map(function (a) { return a.name; }).join(', '), 'ach');
+      if (fresh.length) sfx('ach'), toast('Достижение: ' + fresh.map(function (a) { return a.name; }).join(', '), 'ach');
     }
     try { localStorage.setItem(key, JSON.stringify(done)); } catch (e) {}
   }
@@ -898,6 +1086,7 @@
     rel = next; socialLoaded = true;
     updateBadge(); checkAch();
     if (!$('#fr').hidden) renderFriends();
+    loadCoop();
   }
   function updateBadge() {
     var b = $('#fr-badge'); if (!b) return;
@@ -1082,7 +1271,7 @@
     var r = await sb.rpc('friends_board');
     if (r.error || !user) return;
     board = r.data.map(function (x) {
-      var hrs = Number(x.hours) || 0, xp = x.beaten * 120 + Math.round(hrs) * 3 + x.playing * 15;
+      var hrs = Number(x.hours) || 0, xp = x.beaten * 120 + Math.round(hrs) * 3 + x.playing * 15 + (x.user_id === user.id ? bonusXp() : 0);
       return { uid: x.user_id, nick: x.nick, avatar: Number(x.avatar) || 0, share: x.share, hours: Math.round(hrs * 10) / 10, beaten: x.beaten, xp: xp, lvl: 1 + Math.floor(Math.sqrt(xp / 60)), me: x.user_id === user.id };
     }).sort(function (a, b) { return b.xp - a.xp; });
     if (!$('#fr').hidden) renderFriends();
@@ -1154,7 +1343,7 @@
   }
 
   function bindSocial() {
-    $('#ver').textContent = VERSION;
+    $('#ver').textContent = VERSION; $('#leaf').innerHTML = pix(LEAF, 14); $('#vmode').textContent = view.mode === 'shelf' ? 'Карточки' : 'Полка';
     $('#awards').innerHTML = pix(TROPHY, 20);
     $('#friends').innerHTML = pix(PAD, 22) + '<span class="nb" id="fr-badge" hidden></span>';
     $('#awards').addEventListener('click', openAch);
@@ -1210,6 +1399,18 @@
       b.disabled = false;
       if (r.error) { er.textContent = 'Не удалось сохранить. Попробуй ещё раз.'; er.hidden = false; return; }
       me.bio = bio; me.fav = fav; toast('Профиль сохранён');
+    });
+    $('#leaf').addEventListener('click', openChangelog);
+    $('#cl-close').addEventListener('click', function () { $('#cl').hidden = true; });
+    $('#cl').addEventListener('mousedown', function (e) { if (e.target === $('#cl')) $('#cl').hidden = true; });
+    $('#yr-close').addEventListener('click', function () { $('#yr').hidden = true; });
+    $('#yr').addEventListener('mousedown', function (e) { if (e.target === $('#yr')) $('#yr').hidden = true; });
+    $('#yr-save').addEventListener('click', saveYear);
+    $('#acc-year').addEventListener('click', function () { $('#acc').hidden = true; openYear(); });
+    $('#vmode').addEventListener('click', function () { setMode(view.mode === 'shelf' ? 'cards' : 'shelf'); });
+    $('#acc-snd').addEventListener('change', function (e) {
+      try { localStorage.setItem('gamelog.snd', e.target.checked ? 'on' : 'off'); } catch (er) {}
+      if (e.target.checked) sfx('coin', true);
     });
     $('#acc-fx').addEventListener('change', function (e) {
       var v = e.target.checked ? 'on' : 'off';

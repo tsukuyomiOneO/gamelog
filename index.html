@@ -22,7 +22,7 @@
   <header class="top">
     <div class="brand">
       <div id="logo" aria-hidden="true"></div>
-      <div class="bt"><h1>GameLOG</h1><span class="ver" id="ver"></span></div>
+      <div class="bt"><h1>GameLOG</h1><span class="ver-row"><span class="ver" id="ver"></span><button class="leaf" id="leaf" type="button" title="Что нового" aria-label="Что нового"></button></span></div>
     </div>
     <div class="hdr-r">
       <button class="chip icon" id="awards" type="button" title="Достижения" aria-label="Достижения"></button>
@@ -37,7 +37,7 @@
     <div class="player">
       <div class="avatar" id="avatar" aria-hidden="true"></div>
       <div class="pl-main">
-        <div class="pl-top"><span class="lvl" id="lvl">LVL 01</span><span class="rank" id="rank">Новичок</span></div>
+        <div class="pl-top"><span class="lvl" id="lvl">LVL 01</span><span class="rank" id="rank">Новичок</span><span class="streak" id="streak" hidden></span></div>
         <div>
           <div class="xp-label"><span id="xp">XP 0</span><span id="xp-next"></span></div>
           <div class="segbar" id="xpbar" role="img" aria-label="Опыт до следующего уровня"></div>
@@ -62,6 +62,7 @@
         <option value="hours">По часам</option>
         <option value="title">По алфавиту</option>
       </select>
+      <button class="btn" id="vmode" type="button" title="Вид коллекции">Полка</button>
       <button class="btn primary" id="add" type="button">+ Новая игра</button>
     </div>
   </section>
@@ -114,8 +115,10 @@
       <button class="btn" id="acc-prof-save" type="submit">Сохранить профиль</button>
     </form>
     <label class="chk"><input type="checkbox" id="acc-share"><span>Друзья видят мою коллекцию</span></label>
+    <label class="chk"><input type="checkbox" id="acc-snd"><span>Звуки 8-бит</span></label>
     <label class="chk"><input type="checkbox" id="acc-fx"><span>Анимации и свечение</span></label>
     <div class="acct-row">
+      <button class="btn" id="acc-year" type="button">Итоги года</button>
       <button class="btn" id="acc-export" type="button">Скачать мои данные</button>
       <button class="btn" id="acc-out" type="button">Выйти</button>
       <button class="btn danger" id="acc-del" type="button">Удалить аккаунт</button>
@@ -217,6 +220,7 @@
         <label class="lab"><span>Прогресс: <b id="f-pv">0%</b></span><input id="f-progress" type="range" min="0" max="100" step="10" value="0"></label>
       </div>
       <fieldset><legend>Оценка</legend><div class="rate" id="f-rate"></div></fieldset>
+      <label class="lab" id="f-coop-l" hidden><span>Играю вместе с (2P)</span><select class="field" id="f-coop"></select></label>
       <label class="lab"><span>Заметки</span><textarea class="field" id="f-notes" maxlength="300" placeholder="Что понравилось, где застрял, с кем играешь"></textarea></label>
       <div class="fa">
         <button class="btn danger" id="f-del" type="button" hidden>Удалить</button>
@@ -226,6 +230,21 @@
         </div>
       </div>
     </form>
+  </div>
+</div>
+<!-- Что нового -->
+<div class="overlay" id="cl" hidden>
+  <div class="panel modal" role="dialog" aria-modal="true" aria-labelledby="cl-t">
+    <div class="mh"><h2 id="cl-t">Что нового</h2><button class="x" id="cl-close" type="button" aria-label="Закрыть">×</button></div>
+    <div id="cl-body"></div>
+  </div>
+</div>
+<!-- Итоги года -->
+<div class="overlay" id="yr" hidden>
+  <div class="panel modal" role="dialog" aria-modal="true" aria-labelledby="yr-t">
+    <div class="mh"><h2 id="yr-t">Итоги года</h2><button class="x" id="yr-close" type="button" aria-label="Закрыть">×</button></div>
+    <canvas id="yr-cv" width="1080" height="1350"></canvas>
+    <button class="btn primary" id="yr-save" type="button">Скачать картинку</button>
   </div>
 </div>
 <div class="toast" id="toast" role="status" hidden></div>

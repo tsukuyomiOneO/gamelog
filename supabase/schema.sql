@@ -502,3 +502,8 @@ using (
 
 -- 3) Триггерная функция регистрации не должна вызываться через API.
 revoke execute on function public.handle_new_user() from public, anon, authenticated;
+
+-- Beta v3.0: 2P
+-- Совместные игры (2P): с каким другом играешь в эту игру.
+alter table public.games add column if not exists coop_with uuid references public.profiles(user_id) on delete set null;
+create index if not exists games_coop_idx on public.games (coop_with) where coop_with is not null;
