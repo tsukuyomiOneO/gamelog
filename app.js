@@ -766,7 +766,7 @@
   var LEAF = ['XXXXXX.', 'X....XX', 'X.XXX.X', 'X.....X', 'X.XXX.X', 'X.....X', 'X.XX..X', 'XXXXXXX'];
   var coopMap = {};
   var RELEASES = [
-    ['Beta v3.0', ['Звуки 8-бит (включаются в аккаунте)', 'Ежедневный бонус и серия дней подряд', 'Режим «Полка»: игры стоят корешками картриджей', 'Итоги года: картинка со статистикой, можно скачать', 'Совместные игры 2P: отметь друга и сравнивай прогресс', 'Листочек «Что нового» у версии']],
+    ['Beta v3.0', ['Звуки 8-бит (включаются в аккаунте)', 'Ежедневный бонус и серия дней подряд', 'Режим «Полка»: отсек автомата, картриджи в слотах', 'Итоги года: картинка со статистикой, можно скачать', 'Совместные игры 2P: отметь друга и сравнивай прогресс', 'Листочек «Что нового» у версии']],
     ['Beta v2.9', ['Лимит часов на игру до 99999', 'Большие числа сокращаются: 10.3к, 1.2м']],
     ['Beta v2.8', ['Окошки статистики подстраиваются под длинные числа']],
     ['Beta v2.7', ['Карточки-картриджи', 'Анимации вставки и извлечения игры']],
@@ -846,11 +846,13 @@
 
   /* полка */
   function spine(g) {
-    var st = STATUS[g.status] || STATUS.queue, ro = !!viewing, w = 46 + (hash(g.title) % 3) * 8;
-    var h = '<button class="spine' + (g.status === 'beaten' ? ' beaten' : '') + '" type="button" data-gid="' + esc(g.id) + '"' + (ro ? '' : ' data-act="edit" data-id="' + esc(g.id) + '"') + ' style="--c:' + st.color + ';--w:' + w + 'px" title="' + esc(g.title) + ' · ' + st.label + '">';
-    h += '<i class="sp-top"></i>' + (g.coop ? '<span class="sp-2p">2P</span>' : '');
-    h += '<span class="sp-cover">' + (g.cover ? '<img src="' + esc(g.cover) + '" alt="">' : sprite(g.title)) + '</span>';
-    h += '<span class="sp-t">' + esc(g.title) + '</span><span class="sp-h">' + fmtK(g.hours) + 'Ч</span><i class="sp-pins"></i></button>';
+    var st = STATUS[g.status] || STATUS.queue, ro = !!viewing;
+    var h = '<button class="spine' + (g.status === 'beaten' ? ' beaten' : '') + '" type="button" data-gid="' + esc(g.id) + '"' + (ro ? '' : ' data-act="edit" data-id="' + esc(g.id) + '"') + ' style="--c:' + st.color + '" title="' + esc(g.title) + ' · ' + st.label + '">';
+    h += '<span class="cart"><span class="c-in"><i class="c-grip"></i>';
+    h += '<span class="c-label"><span class="c-cover">' + (g.cover ? '<img src="' + esc(g.cover) + '" alt="">' : sprite(g.title)) + '</span></span>';
+    h += '<span class="c-t">' + esc(g.title) + '</span><span class="c-m"><b>' + fmtK(g.hours) + ' Ч</b><em>' + (g.rating > 0 ? '★' + g.rating : '') + '</em></span></span>';
+    h += (g.coop ? '<span class="sp-2p">2P</span>' : '') + '</span>';
+    h += '<span class="mouth"><i class="led"></i><span>' + esc(st.label) + '</span></span></button>';
     return h;
   }
 
