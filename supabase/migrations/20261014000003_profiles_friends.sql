@@ -92,7 +92,7 @@ create policy profiles_update_own on public.profiles
 
 revoke all on public.profiles from anon, authenticated;
 grant select on public.profiles to authenticated;
-grant update (nick, share_collection) on public.profiles to authenticated;
+grant update (nick, share_collection, avatar, bio, fav_game) on public.profiles to authenticated;
 
 -- 2. Друзья --------------------------------------------------------------------
 

@@ -231,7 +231,7 @@ create policy profiles_update_own on public.profiles
 
 revoke all on public.profiles from anon, authenticated;
 grant select on public.profiles to authenticated;
-grant update (nick, share_collection) on public.profiles to authenticated;
+grant update (nick, share_collection, avatar, bio, fav_game) on public.profiles to authenticated;
 
 -- 2. Друзья --------------------------------------------------------------------
 
@@ -507,3 +507,6 @@ revoke execute on function public.handle_new_user() from public, anon, authentic
 -- Совместные игры (2P): с каким другом играешь в эту игру.
 alter table public.games add column if not exists coop_with uuid references public.profiles(user_id) on delete set null;
 create index if not exists games_coop_idx on public.games (coop_with) where coop_with is not null;
+
+-- Права на профиль повторяем, чтобы повторный запуск файла их не сбрасывал.
+grant update (nick, share_collection, avatar, bio, fav_game) on public.profiles to authenticated;

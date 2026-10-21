@@ -21,3 +21,6 @@ using (
 
 -- 3) Триггерная функция регистрации не должна вызываться через API.
 revoke execute on function public.handle_new_user() from public, anon, authenticated;
+
+-- Права на профиль повторяем, чтобы повторный запуск файла их не сбрасывал.
+grant update (nick, share_collection, avatar, bio, fav_game) on public.profiles to authenticated;
