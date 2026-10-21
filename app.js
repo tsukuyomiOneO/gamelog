@@ -231,6 +231,7 @@
       if (s === 'rating') return (b.rating || 0) - (a.rating || 0) || (b.updated || 0) - (a.updated || 0);
       if (s === 'hours') return (b.hours || 0) - (a.hours || 0);
       if (s === 'title') return String(a.title).localeCompare(String(b.title), 'ru');
+      if (s === 'manual') { var oa = orderIdx(a.id), ob = orderIdx(b.id); if (oa !== ob) return oa - ob; }
       return (b.updated || 0) - (a.updated || 0);
     });
     return list;
@@ -359,14 +360,20 @@
     }
     el.className = view.mode === 'shelf' ? 'shelf' : 'grid';
     var shelfMode = view.mode === 'shelf';
+    var keepScr = snake.on ? $('#scr') : null;
     var pf = profile();
     var cab = '<div class="sign"><b>GameLOG</b><span>ИГР ' + pf.n + ' · ПРОЙДЕНО ' + pf.beaten + '</span><div class="marq" aria-hidden="true"><span>★ GAMELOG ★ ВСТАВЬ МОНЕТУ ★ PRESS START ★ ВЫБЕРИ ИГРУ ★ GAMELOG ★ ВСТАВЬ МОНЕТУ ★ PRESS START ★ ВЫБЕРИ ИГРУ </span></div></div>' +
       '<div class="scr"><div class="scr-in" id="scr"></div></div>' +
       '<div class="deck"><div class="stick"><i></i></div><div class="btns"><b class="r"></b><b class="y"></b></div>' +
       '<button class="coinb" id="coin" type="button" aria-label="Вставить монету"><i></i><span>МОНЕТА</span></button>' +
+      '<button class="coinb paintb" id="paint" type="button" aria-label="Сменить цвет корпуса"><i></i><span>КРАСКА</span></button>' +
       '<div class="btns"><b class="g"></b><b class="b"></b></div><div class="stick"><i></i></div></div>';
     el.innerHTML = shelfMode ? cab + '<div class="bay">' + list.map(function (g, i) { return spine(g, i); }).join('') + '</div><div class="kick" aria-hidden="true"><span>★ ARCADE ★ GAMELOG ★ ARCADE ★</span></div>' : list.map(card).join('');
-    if (shelfMode) scrAttract();
+    if (shelfMode) {
+      el.setAttribute('data-cab', cabCur());
+      var ns = $('#scr');
+      if (keepScr && ns) ns.parentNode.replaceChild(keepScr, ns); else scrAttract();
+    } else el.removeAttribute('data-cab');
     if (shelfMode && shelfBoot && fxOn()) {
       shelfBoot = false; el.classList.add('boot');
       setTimeout(function () { el.classList.remove('boot'); }, 700 + list.length * 70);
@@ -653,7 +660,7 @@
       view.tab = b.getAttribute('data-tab'); renderTabs(); renderGrid();
     });
     $('#q').addEventListener('input', function (e) { view.q = e.target.value; renderGrid(); });
-    $('#sort').addEventListener('change', function (e) { view.sort = e.target.value; renderGrid(); });
+    $('#sort').addEventListener('change', function (e) { view.sort = e.target.value; try { localStorage.setItem('gamelog.sort', view.sort); } catch (er) {} renderGrid(); });
     $('#add').addEventListener('click', function () { openModal(null); });
     $('#acct').addEventListener('click', openAccount);
     $('#a-resend').addEventListener('click', async function () {
@@ -778,6 +785,7 @@
   var LEAF = ['XXXXXX.', 'X....XX', 'X.XXX.X', 'X.....X', 'X.XXX.X', 'X.....X', 'X.XX..X', 'XXXXXXX'];
   var coopMap = {};
   var RELEASES = [
+    ['Beta v3.3', ['Демо-режим: экран сам листает игры, если ничего не трогать', 'Змейка на экране автомата: рекорд даёт бонус XP', 'Расцветки корпуса по уровню: КЛАССИКА, КОСМО, РЕТРО, ЗОЛОТО (кнопка «КРАСКА»)', 'Перетаскивание картриджей на полке, сортировка «Мой порядок»']],
     ['Beta v3.2', ['Полка стала полноценным автоматом: вывеска, CRT-экран с данными игры, пульт с джойстиками и кнопкой «Монета», отсек картриджей, цоколь', 'Экран показывает игру под курсором, в покое «ВСТАВЬ МОНЕТУ» и лидера по часам', 'Надписи автомата не выделяются']],
     ['Beta v3.1', ['Полка: корпус автомата с бегущей строкой и неоновыми боками', 'Глянец на картриджах, подсветка слотов цветом статуса', 'Вставка картриджа с отскоком и «кликом», выброс на пружине', 'Включение автомата: слоты загораются волной', 'Управление стрелками и курсор ▼, табло с данными при наведении']],
     ['Beta v3.0', ['Звуки 8-бит (включаются в аккаунте)', 'Ежедневный бонус и серия дней подряд', 'Режим «Полка»: отсек автомата, картриджи в слотах', 'Итоги года: картинка со статистикой, можно скачать', 'Совместные игры 2P: отметь друга и сравнивай прогресс', 'Листочек «Что нового» у версии']],
@@ -880,7 +888,7 @@
     scrId = null;
     var top = games.slice().sort(function (a, b) { return (b.hours || 0) - (a.hours || 0); })[0];
     el.innerHTML = '<div class="scr-att"><b class="blink">ВСТАВЬ МОНЕТУ</b><span>КРЕДИТЫ: ' + String(credits).padStart(2, '0') + '</span>' +
-      (top && top.hours ? '<em>ЛИДЕР ПО ЧАСАМ: ' + esc(top.title) + ' · ' + fmtK(top.hours) + ' Ч</em>' : '<em>НАВЕДИ НА КАРТРИДЖ</em>') + '</div>';
+      (top && top.hours ? '<em>ЛИДЕР ПО ЧАСАМ: ' + esc(top.title) + ' · ' + fmtK(top.hours) + ' Ч</em>' : '<em>НАВЕДИ НА КАРТРИДЖ</em>') + '<button class="snk-btn" type="button" data-snake="start">▶ ИГРАТЬ В ЗМЕЙКУ · РЕКОРД ' + snakeRec() + '</button></div>';
   }
   function scrShow(id) {
     var el = $('#scr'), g = games.filter(function (x) { return x.id === id; })[0];
@@ -897,12 +905,155 @@
       (cf ? '<span class="scr-r"><u>2P · ' + esc(cf.nick) + '</u>' + (cp != null ? cp + '%' : '—') + '</span>' : '') + '</div></div>';
   }
   function shelfOver(e) {
-    if (view.mode !== 'shelf') return;
+    if (view.mode !== 'shelf' || snake.on) return;
     var sp = e.target.closest && e.target.closest('.spine');
     if (sp) scrShow(sp.getAttribute('data-gid'));
     else if (e.type === 'mouseout' && !(e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest('.spine'))) scrAttract();
   }
   var shelfBoot = view.mode === 'shelf';
+
+  /* ---------- Beta v3.3: демо, змейка, краска, перетаскивание ---------- */
+  var snake = { on: false };
+  function snakeRec() { try { return Number(localStorage.getItem('gamelog.snake.' + (user ? user.id : ''))) || 0; } catch (e) { return 0; } }
+  function addBonus(n) {
+    var st = streakGet(); st.bonus += n;
+    try { localStorage.setItem('gamelog.streak.' + user.id, JSON.stringify({ last: st.last, n: st.n, bonus: st.bonus })); } catch (e) {}
+    renderHud();
+  }
+  function snakeStart() {
+    var el = $('#scr'); if (!el || !user) return;
+    var W = 28, H = 16, C = 12, rec = snakeRec();
+    el.innerHTML = '<div class="snk"><div class="snk-hud"><span>СЧЁТ <b id="snk-s">0</b></span><span>РЕКОРД ' + rec + '</span><button type="button" data-snake="exit">ВЫХОД</button></div><canvas id="snk-cv" width="' + W * C + '" height="' + H * C + '"></canvas></div>';
+    var cv = $('#snk-cv'), cx = cv.getContext('2d');
+    var body = [[8, 8], [7, 8], [6, 8]], dir = [1, 0], nd = [1, 0], food = [18, 8], score = 0, delay = 130;
+    snake.on = true; scrId = null; var alive = true;
+    function put() { do { food = [Math.floor(Math.random() * W), Math.floor(Math.random() * H)]; } while (body.some(function (p) { return p[0] === food[0] && p[1] === food[1]; })); }
+    function draw() {
+      cx.fillStyle = '#050200'; cx.fillRect(0, 0, W * C, H * C);
+      cx.fillStyle = 'rgba(255, 210, 63, 0.08)'; for (var x = 0; x < W; x++) for (var y = 0; y < H; y++) cx.fillRect(x * C + 5, y * C + 5, 2, 2);
+      cx.fillStyle = '#ff3b5c'; cx.fillRect(food[0] * C + 2, food[1] * C + 2, C - 4, C - 4);
+      body.forEach(function (p, i) { cx.fillStyle = i ? '#ffd23f' : '#fff3b0'; cx.fillRect(p[0] * C + 1, p[1] * C + 1, C - 2, C - 2); });
+    }
+    function end() {
+      alive = false; document.removeEventListener('keydown', key); cv.removeEventListener('touchstart', ts); cv.removeEventListener('touchend', te);
+      var msg = 'КОНЕЦ ИГРЫ · СЧЁТ ' + score;
+      if (score > rec) {
+        try { localStorage.setItem('gamelog.snake.' + user.id, String(score)); } catch (e) {}
+        var gain = (score - rec) * 2; addBonus(gain); sfx('win'); toast('Рекорд змейки! +' + gain + ' XP', 'ach'); msg = 'НОВЫЙ РЕКОРД: ' + score + ' · +' + gain + ' XP';
+      } else sfx('eject');
+      var box = document.querySelector('.snk');
+      if (box) box.insertAdjacentHTML('beforeend', '<div class="snk-over"><b>' + msg + '</b><button type="button" data-snake="start">ЕЩЁ РАЗ</button><button type="button" data-snake="exit">ВЫХОД</button></div>');
+    }
+    function step() {
+      if (!alive) return;
+      if (!document.body.contains(cv)) { alive = false; snake.on = false; document.removeEventListener('keydown', key); return; }
+      dir = nd;
+      var h = [body[0][0] + dir[0], body[0][1] + dir[1]];
+      if (h[0] < 0 || h[1] < 0 || h[0] >= W || h[1] >= H || body.some(function (p) { return p[0] === h[0] && p[1] === h[1]; })) return end();
+      body.unshift(h);
+      if (h[0] === food[0] && h[1] === food[1]) { score++; $('#snk-s').textContent = score; sfx('tick'); delay = Math.max(65, delay - 3); put(); } else body.pop();
+      draw(); setTimeout(step, delay);
+    }
+    function turn(dx, dy) { if (dx !== -dir[0] || dy !== -dir[1]) nd = [dx, dy]; }
+    function key(e) {
+      var m = { ArrowLeft: [-1, 0], KeyA: [-1, 0], ArrowRight: [1, 0], KeyD: [1, 0], ArrowUp: [0, -1], KeyW: [0, -1], ArrowDown: [0, 1], KeyS: [0, 1] }[e.code];
+      if (e.key === 'Escape') { alive = false; snake.on = false; document.removeEventListener('keydown', key); scrAttract(); return; }
+      if (m) { e.preventDefault(); turn(m[0], m[1]); }
+    }
+    var tx = 0, ty = 0;
+    function ts(e) { tx = e.touches[0].clientX; ty = e.touches[0].clientY; }
+    function te(e) {
+      var dx = e.changedTouches[0].clientX - tx, dy = e.changedTouches[0].clientY - ty;
+      if (Math.abs(dx) < 12 && Math.abs(dy) < 12) return;
+      if (Math.abs(dx) > Math.abs(dy)) turn(dx > 0 ? 1 : -1, 0); else turn(0, dy > 0 ? 1 : -1);
+    }
+    document.addEventListener('keydown', key); cv.addEventListener('touchstart', ts, { passive: true }); cv.addEventListener('touchend', te);
+    draw(); setTimeout(step, 400);
+  }
+
+  /* демо-режим: экран сам листает игры, если долго ничего не трогать */
+  var lastAct = Date.now(), demoOn = false, demoAt = 0, demoI = 0;
+  function actNow() {
+    lastAct = Date.now();
+    if (demoOn) { demoOn = false; if (!document.querySelector('.spine:hover')) scrAttract(); }
+  }
+  ['mousemove', 'mousedown', 'keydown', 'touchstart', 'wheel'].forEach(function (ev) { document.addEventListener(ev, actNow, { passive: true }); });
+  setInterval(function () {
+    if (view.mode !== 'shelf' || snake.on || !$('#scr') || !games.length || !fxOn()) return;
+    if (Date.now() - lastAct < 25000 || (demoOn && Date.now() - demoAt < 3500)) return;
+    demoOn = true; demoAt = Date.now(); scrId = null;
+    scrShow(games[demoI++ % games.length].id);
+    var g = document.querySelector('#scr .scr-game'); if (g) g.insertAdjacentHTML('beforeend', '<span class="scr-demo blink">ДЕМО</span>');
+  }, 1000);
+
+  /* расцветки корпуса по уровню */
+  var CABS = [['classic', 'КЛАССИКА', 1], ['cosmo', 'КОСМО', 3], ['retro', 'РЕТРО', 5], ['gold', 'ЗОЛОТО', 8]];
+  function myLvl() {
+    var list = viewing ? (mine || []) : games, b = 0, p = 0, h = 0;
+    list.forEach(function (g) { if (g.status === 'beaten') b++; if (g.status === 'playing') p++; h += Number(g.hours) || 0; });
+    return 1 + Math.floor(Math.sqrt((b * 120 + Math.round(h) * 3 + p * 15 + bonusXp()) / 60));
+  }
+  function cabCur() {
+    var v = 'classic'; try { v = localStorage.getItem('gamelog.cab') || 'classic'; } catch (e) {}
+    var c = CABS.filter(function (x) { return x[0] === v; })[0];
+    return c && c[2] <= myLvl() ? v : 'classic';
+  }
+  function cabNext() {
+    var lv = myLvl(), un = CABS.filter(function (x) { return x[2] <= lv; }), lk = CABS.filter(function (x) { return x[2] > lv; });
+    var cur = cabCur(), i = un.map(function (x) { return x[0]; }).indexOf(cur), nx = un[(i + 1) % un.length];
+    try { localStorage.setItem('gamelog.cab', nx[0]); } catch (e) {}
+    $('#grid').setAttribute('data-cab', nx[0]); sfx('tick');
+    toast('Корпус: ' + nx[1] + (lk.length ? ' · «' + lk[0][1] + '» откроется на LVL ' + lk[0][2] : ''));
+  }
+
+  /* свой порядок картриджей */
+  function orderGet() { try { var a = JSON.parse(localStorage.getItem('gamelog.order.' + (user ? user.id : '')) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+  function orderIdx(id) { var i = orderGet().indexOf(id); return i < 0 ? 1e9 : i; }
+  var drag = null, dragSuppress = 0;
+  function dragReorder(from, to) {
+    var cur = orderGet().filter(function (id) { return games.some(function (g) { return g.id === id; }); });
+    games.slice().sort(function (a, b) { return (b.updated || 0) - (a.updated || 0); }).forEach(function (g) { if (cur.indexOf(g.id) < 0) cur.push(g.id); });
+    cur.splice(cur.indexOf(from), 1); cur.splice(cur.indexOf(to), 0, from);
+    try { localStorage.setItem('gamelog.order.' + user.id, JSON.stringify(cur)); localStorage.setItem('gamelog.sort', 'manual'); } catch (e) {}
+    view.sort = 'manual'; $('#sort').value = 'manual';
+  }
+  function dragInit() {
+    var grid = $('#grid');
+    grid.addEventListener('pointerdown', function (e) {
+      if (viewing || view.mode !== 'shelf' || e.button > 0) return;
+      var sp = e.target.closest && e.target.closest('.spine'); if (!sp) return;
+      drag = { el: sp, id: sp.getAttribute('data-gid'), x: e.clientX, y: e.clientY, on: false, touch: e.pointerType === 'touch', t0: Date.now(), over: null };
+    });
+    document.addEventListener('pointermove', function (e) {
+      if (!drag) return;
+      var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      if (!drag.on) {
+        var far = Math.abs(dx) > 8 || Math.abs(dy) > 8;
+        if (!far) return;
+        if (drag.touch && Date.now() - drag.t0 < 350) { drag = null; return; }
+        drag.on = true; drag.el.classList.add('dragging'); sfx('tick');
+      }
+      drag.el.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+      drag.el.style.pointerEvents = 'none';
+      var u = document.elementFromPoint(e.clientX, e.clientY), t = u && u.closest ? u.closest('.spine') : null;
+      if (drag.over && drag.over !== t) drag.over.classList.remove('dropt');
+      drag.over = t && t !== drag.el ? t : null; if (drag.over) drag.over.classList.add('dropt');
+    });
+    document.addEventListener('touchmove', function (e) { if (drag && drag.on) e.preventDefault(); }, { passive: false });
+    function fin(cancel) {
+      if (!drag) return;
+      var d = drag; drag = null;
+      if (!d.on) return;
+      dragSuppress = Date.now();
+      d.el.classList.remove('dragging'); d.el.style.transform = ''; d.el.style.pointerEvents = '';
+      if (d.over) d.over.classList.remove('dropt');
+      if (!cancel && d.over) { dragReorder(d.id, d.over.getAttribute('data-gid')); sfx('click'); renderGrid(); }
+    }
+    document.addEventListener('pointerup', function () { fin(false); });
+    document.addEventListener('pointercancel', function () { fin(true); });
+    grid.addEventListener('click', function (e) { if (Date.now() - dragSuppress < 350) { e.stopPropagation(); e.preventDefault(); } }, true);
+  }
+
   function shelfNav(e) {
     if (view.mode !== 'shelf') return;
     var k = e.key; if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].indexOf(k) < 0) return;
@@ -999,7 +1150,7 @@
   }
 
   /* ---------- Beta v2.0: ники, друзья, достижения ---------- */
-  var VERSION = 'Beta v3.2';
+  var VERSION = 'Beta v3.3';
   var NICK_RE = /^[A-Za-z0-9_А-Яа-яЁё]{3,20}$/;
   var me = { nick: '', share: true, avatar: 0, bio: '', fav: '' };
   var rel = { friends: [], incoming: [], outgoing: [] };
@@ -1460,12 +1611,17 @@
       if (r.error) { er.textContent = 'Не удалось сохранить. Попробуй ещё раз.'; er.hidden = false; return; }
       me.bio = bio; me.fav = fav; toast('Профиль сохранён');
     });
+    dragInit();
+    try { var sv = localStorage.getItem('gamelog.sort'); if (sv && $('#sort').querySelector('option[value="' + sv + '"]')) { view.sort = sv; $('#sort').value = sv; } } catch (e) {}
     $('#grid').addEventListener('keydown', shelfNav);
     $('#grid').addEventListener('mouseover', shelfOver);
     $('#grid').addEventListener('mouseout', shelfOver);
     $('#grid').addEventListener('focusin', shelfOver);
     $('#grid').addEventListener('click', function (e) {
+      var sn = e.target.closest && e.target.closest('[data-snake]');
+      if (sn) { var a = sn.getAttribute('data-snake'); if (a === 'exit') { snake.on = false; scrAttract(); } else snakeStart(); return; }
       var d = e.target.closest && e.target.closest('.deck'); if (!d) return;
+      if (e.target.closest('#paint')) { cabNext(); return; }
       var cb = e.target.closest('#coin');
       if (cb) { credits = Math.min(99, credits + 1); sfx('coin'); cb.classList.add('hit'); setTimeout(function () { cb.classList.remove('hit'); }, 300); if (!scrId) scrAttract(); }
       else if (e.target.closest('.btns b, .stick')) sfx('tick');
