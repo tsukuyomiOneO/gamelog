@@ -360,7 +360,6 @@
     }
     el.className = view.mode === 'shelf' ? 'shelf' : 'grid';
     var shelfMode = view.mode === 'shelf';
-    var keepScr = snake.on ? $('#scr') : null;
     var pf = profile();
     var cab = '<div class="sign"><b>GameLOG</b><span>ИГР ' + pf.n + ' · ПРОЙДЕНО ' + pf.beaten + '</span><div class="marq" aria-hidden="true"><span>★ GAMELOG ★ ВСТАВЬ МОНЕТУ ★ PRESS START ★ ВЫБЕРИ ИГРУ ★ GAMELOG ★ ВСТАВЬ МОНЕТУ ★ PRESS START ★ ВЫБЕРИ ИГРУ </span></div></div>' +
       '<div class="scr"><div class="scr-in" id="scr"></div></div>' +
@@ -371,8 +370,8 @@
     el.innerHTML = shelfMode ? cab + '<div class="bay">' + list.map(function (g, i) { return spine(g, i); }).join('') + '</div><div class="kick" aria-hidden="true"><span>★ ARCADE ★ GAMELOG ★ ARCADE ★</span></div>' : list.map(card).join('');
     if (shelfMode) {
       el.setAttribute('data-cab', cabCur());
-      var ns = $('#scr');
-      if (keepScr && ns) ns.parentNode.replaceChild(keepScr, ns); else scrAttract();
+      if (selId && !games.some(function (x) { return x.id === selId; })) selId = null;
+      if (selId) { scrId = null; scrShow(selId); } else scrAttract();
     } else el.removeAttribute('data-cab');
     if (shelfMode && shelfBoot && fxOn()) {
       shelfBoot = false; el.classList.add('boot');
@@ -678,6 +677,7 @@
       var b = e.target.closest('[data-act]'); if (!b) return;
       var act = b.getAttribute('data-act'), id = b.getAttribute('data-id');
       if (act === 'edit') openModal(id);
+      if (act === 'pick') scrPick(id);
       if (act === 'new') openModal(null);
       if (act === 'demo') addExamples();
       if (act === 'rx') toggleRx(id, b.getAttribute('data-k'));
@@ -696,6 +696,7 @@
     $('#acc-close').addEventListener('click', function () { $('#acc').hidden = true; });
     document.addEventListener('keydown', function (e) {
       if (e.key !== 'Escape') return;
+      if (selId && view.mode === 'shelf' && $('#ov').hidden && $('#acc').hidden) { scrClose(); return; }
       if (!$('#ov').hidden) closeModal(); else if (!$('#acc').hidden) $('#acc').hidden = true;
       else if (!$('#rec').hidden) $('#rec').hidden = true; else if (!$('#cmp').hidden) $('#cmp').hidden = true;
       else if (!$('#fr').hidden) $('#fr').hidden = true; else if (!$('#aw').hidden) $('#aw').hidden = true;
@@ -785,6 +786,7 @@
   var LEAF = ['XXXXXX.', 'X....XX', 'X.XXX.X', 'X.....X', 'X.XXX.X', 'X.....X', 'X.XX..X', 'XXXXXXX'];
   var coopMap = {};
   var RELEASES = [
+    ['Beta v3.4', ['Змейка убрана', 'Полка: выбор картриджа показывает игру на экране автомата', 'Изменить и удалить игру можно прямо на экране автомата']],
     ['Beta v3.3', ['Демо-режим: экран сам листает игры, если ничего не трогать', 'Змейка на экране автомата: рекорд даёт бонус XP', 'Расцветки корпуса по уровню: КЛАССИКА, КОСМО, РЕТРО, ЗОЛОТО (кнопка «КРАСКА»)', 'Перетаскивание картриджей на полке, сортировка «Мой порядок»']],
     ['Beta v3.2', ['Полка стала полноценным автоматом: вывеска, CRT-экран с данными игры, пульт с джойстиками и кнопкой «Монета», отсек картриджей, цоколь', 'Экран показывает игру под курсором, в покое «ВСТАВЬ МОНЕТУ» и лидера по часам', 'Надписи автомата не выделяются']],
     ['Beta v3.1', ['Полка: корпус автомата с бегущей строкой и неоновыми боками', 'Глянец на картриджах, подсветка слотов цветом статуса', 'Вставка картриджа с отскоком и «кликом», выброс на пружине', 'Включение автомата: слоты загораются волной', 'Управление стрелками и курсор ▼, табло с данными при наведении']],
@@ -874,7 +876,7 @@
     var cf = g.coop ? rel.friends.filter(function (f) { return f.uid === g.coop; })[0] : null;
     var cp = cf ? coopMap[cf.uid + '|' + g.title.trim().toLowerCase()] : null;
     var pr = g.status === 'wish' ? '' : ' · ' + (g.status === 'beaten' ? 100 : (g.progress || 0)) + '%';
-    var h = '<button class="spine' + (g.status === 'beaten' ? ' beaten' : '') + '" type="button" data-gid="' + esc(g.id) + '"' + (ro ? '' : ' data-act="edit" data-id="' + esc(g.id) + '"') + ' style="--c:' + st.color + ';--i:' + (i || 0) + '" aria-label="' + esc(g.title) + ', ' + st.label + '">';
+    var h = '<button class="spine' + (g.status === 'beaten' ? ' beaten' : '') + (g.id === selId ? ' sel' : '') + '" type="button" data-gid="' + esc(g.id) + '" data-act="pick" data-id="' + esc(g.id) + '" style="--c:' + st.color + ';--i:' + (i || 0) + '" aria-label="' + esc(g.title) + ', ' + st.label + '">';
     h += '<span class="cart"><span class="c-in"><i class="c-grip"></i>';
     h += '<span class="c-label"><span class="c-cover">' + (g.cover ? '<img src="' + esc(g.cover) + '" alt="">' : sprite(g.title)) + '</span></span>';
     h += '<span class="c-t">' + esc(g.title) + '</span><span class="c-m"><b>' + fmtK(g.hours) + ' Ч</b><em>' + (g.rating > 0 ? '★' + g.rating : '') + '</em></span></span>';
@@ -888,7 +890,7 @@
     scrId = null;
     var top = games.slice().sort(function (a, b) { return (b.hours || 0) - (a.hours || 0); })[0];
     el.innerHTML = '<div class="scr-att"><b class="blink">ВСТАВЬ МОНЕТУ</b><span>КРЕДИТЫ: ' + String(credits).padStart(2, '0') + '</span>' +
-      (top && top.hours ? '<em>ЛИДЕР ПО ЧАСАМ: ' + esc(top.title) + ' · ' + fmtK(top.hours) + ' Ч</em>' : '<em>НАВЕДИ НА КАРТРИДЖ</em>') + '<button class="snk-btn" type="button" data-snake="start">▶ ИГРАТЬ В ЗМЕЙКУ · РЕКОРД ' + snakeRec() + '</button></div>';
+      (top && top.hours ? '<em>ЛИДЕР ПО ЧАСАМ: ' + esc(top.title) + ' · ' + fmtK(top.hours) + ' Ч</em>' : '<em>ВЫБЕРИ КАРТРИДЖ: ЭКРАН ПОКАЖЕТ ИГРУ И ДАСТ ЕЁ ИЗМЕНИТЬ</em>') + '</div>';
   }
   function scrShow(id) {
     var el = $('#scr'), g = games.filter(function (x) { return x.id === id; })[0];
@@ -902,10 +904,65 @@
       '<span class="scr-r"><u>ЧАСОВ</u>' + fmtK(g.hours) + '</span>' +
       (g.status !== 'wish' ? '<span class="scr-r"><u>ПРОГРЕСС</u>' + p + '%</span><div class="segbar" style="--c:' + st.color + '">' + seg(Math.round(p / 10), 10) + '</div>' : '') +
       (g.rating > 0 ? '<span class="scr-r"><u>ОЦЕНКА</u>' + '★'.repeat(g.rating) + '</span>' : '') +
-      (cf ? '<span class="scr-r"><u>2P · ' + esc(cf.nick) + '</u>' + (cp != null ? cp + '%' : '—') + '</span>' : '') + '</div></div>';
+      (cf ? '<span class="scr-r"><u>2P · ' + esc(cf.nick) + '</u>' + (cp != null ? cp + '%' : '—') + '</span>' : '') +
+      (g.notes ? '<span class="scr-n">' + esc(g.notes) + '</span>' : '') +
+      (selId === id ? '<div class="scr-act">' + (viewing ? '' : '<button type="button" data-scr="edit">ИЗМЕНИТЬ</button><button type="button" data-scr="full">ОБЛОЖКА И ВСЁ ОСТАЛЬНОЕ</button>') + '<button type="button" data-scr="close">ЗАКРЫТЬ ✕</button></div>' : '') + '</div></div>';
+  }
+  function scrPick(id) {
+    if (selId === id) { scrClose(); return; }
+    selId = id; scrId = null; scrShow(id);
+    var l = document.querySelectorAll('#grid .spine');
+    for (var i = 0; i < l.length; i++) l[i].classList.toggle('sel', l[i].getAttribute('data-gid') === id);
+    var sc = $('#scr'); if (sc) { var r = sc.getBoundingClientRect(); if (r.top < 0 || r.bottom > innerHeight) sc.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+    sfx('tick');
+  }
+  function scrClose() {
+    selId = null; scrId = null; scrAttract();
+    var l = document.querySelectorAll('#grid .spine.sel'); for (var i = 0; i < l.length; i++) l[i].classList.remove('sel');
+  }
+  function scrEdit(id) {
+    var g = games.filter(function (x) { return x.id === id; })[0], el = $('#scr'); if (!g || !el || viewing) return;
+    scrId = 'edit:' + id;
+    function inp(label, idn, val, extra) { return '<label class="sf"><span>' + label + '</span><input id="' + idn + '" value="' + esc(val) + '" ' + (extra || '') + ' autocomplete="off"></label>'; }
+    var so = ORDER.map(function (k) { return '<option value="' + k + '"' + (g.status === k ? ' selected' : '') + '>' + STATUS[k].label + '</option>'; }).join('');
+    var ro = [0, 1, 2, 3, 4, 5].map(function (k) { return '<option value="' + k + '"' + ((g.rating || 0) === k ? ' selected' : '') + '>' + (k ? '★'.repeat(k) : 'Без оценки') + '</option>'; }).join('');
+    var co = '<option value="">Один</option>' + rel.friends.map(function (f) { return '<option value="' + esc(f.uid) + '"' + (g.coop === f.uid ? ' selected' : '') + '>' + esc(f.nick) + '</option>'; }).join('');
+    el.innerHTML = '<form class="scr-form" id="scr-form" data-id="' + esc(id) + '" novalidate><b class="scr-t">ИЗМЕНИТЬ КАРТРИДЖ</b><div class="sf-grid">' +
+      inp('Название', 'se-t', g.title, 'maxlength="80"') + inp('Платформа', 'se-pl', g.platform, 'maxlength="30"') + inp('Жанр', 'se-g', g.genre, 'maxlength="30"') +
+      '<label class="sf"><span>Статус</span><select id="se-s">' + so + '</select></label>' +
+      inp('Часов', 'se-h', g.hours || 0, 'type="number" min="0" max="99999" step="0.5" inputmode="decimal"') +
+      '<label class="sf"><span>Прогресс <b id="se-pv">' + (g.progress || 0) + '%</b></span><input id="se-p" type="range" min="0" max="100" step="10" value="' + (g.progress || 0) + '"></label>' +
+      '<label class="sf"><span>Оценка</span><select id="se-r">' + ro + '</select></label>' +
+      (rel.friends.length || g.coop ? '<label class="sf"><span>2P с другом</span><select id="se-c">' + co + '</select></label>' : '') +
+      '<label class="sf wide"><span>Заметки</span><input id="se-n" value="' + esc(g.notes || '') + '" maxlength="300" autocomplete="off"></label></div>' +
+      '<p class="sf-err" id="se-err" hidden>Введи название игры.</p>' +
+      '<div class="scr-act"><button type="submit">СОХРАНИТЬ</button><button type="button" data-scr="cancel">ОТМЕНА</button><button type="button" class="sf-del" data-scr="del">УДАЛИТЬ</button></div></form>';
+    var t = $('#se-t'); if (t) t.focus();
+  }
+  function scrSave(form) {
+    var id = form.getAttribute('data-id'), g = games.filter(function (x) { return x.id === id; })[0]; if (!g) return;
+    var title = $('#se-t').value.trim(); if (!title) { $('#se-err').hidden = false; $('#se-t').focus(); return; }
+    var n = Object.assign({}, g), h = parseFloat($('#se-h').value);
+    n.title = title; n.platform = $('#se-pl').value.trim(); n.genre = $('#se-g').value.trim(); n.status = $('#se-s').value;
+    n.hours = isFinite(h) && h > 0 ? Math.min(h, 99999) : 0; n.progress = Number($('#se-p').value) || 0; n.rating = Number($('#se-r').value) || 0;
+    n.notes = $('#se-n').value.trim(); var c = $('#se-c'); n.coop = c ? (c.value || null) : g.coop;
+    scrId = null; saveGame(n, null, false); toast('Сохранено');
+    scrShow(id);
+  }
+  function scrAction(a) {
+    var id = selId; if (!id) return;
+    if (a === 'close') return scrClose();
+    if (a === 'edit') return scrEdit(id);
+    if (a === 'cancel') { scrId = null; return scrShow(id); }
+    if (a === 'full') return openModal(id);
+    if (a === 'del') {
+      var b = document.querySelector('.sf-del');
+      if (b && !b.classList.contains('armed')) { b.classList.add('armed'); b.textContent = 'ТОЧНО УДАЛИТЬ?'; return; }
+      selId = null; scrId = null; removeGame(id); scrAttract();
+    }
   }
   function shelfOver(e) {
-    if (view.mode !== 'shelf' || snake.on) return;
+    if (view.mode !== 'shelf' || selId) return;
     var sp = e.target.closest && e.target.closest('.spine');
     if (sp) scrShow(sp.getAttribute('data-gid'));
     else if (e.type === 'mouseout' && !(e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest('.spine'))) scrAttract();
@@ -913,64 +970,12 @@
   var shelfBoot = view.mode === 'shelf';
 
   /* ---------- Beta v3.3: демо, змейка, краска, перетаскивание ---------- */
-  var snake = { on: false };
-  function snakeRec() { try { return Number(localStorage.getItem('gamelog.snake.' + (user ? user.id : ''))) || 0; } catch (e) { return 0; } }
+  var selId = null;
   function addBonus(n) {
     var st = streakGet(); st.bonus += n;
     try { localStorage.setItem('gamelog.streak.' + user.id, JSON.stringify({ last: st.last, n: st.n, bonus: st.bonus })); } catch (e) {}
     renderHud();
   }
-  function snakeStart() {
-    var el = $('#scr'); if (!el || !user) return;
-    var W = 28, H = 16, C = 12, rec = snakeRec();
-    el.innerHTML = '<div class="snk"><div class="snk-hud"><span>СЧЁТ <b id="snk-s">0</b></span><span>РЕКОРД ' + rec + '</span><button type="button" data-snake="exit">ВЫХОД</button></div><canvas id="snk-cv" width="' + W * C + '" height="' + H * C + '"></canvas></div>';
-    var cv = $('#snk-cv'), cx = cv.getContext('2d');
-    var body = [[8, 8], [7, 8], [6, 8]], dir = [1, 0], nd = [1, 0], food = [18, 8], score = 0, delay = 130;
-    snake.on = true; scrId = null; var alive = true;
-    function put() { do { food = [Math.floor(Math.random() * W), Math.floor(Math.random() * H)]; } while (body.some(function (p) { return p[0] === food[0] && p[1] === food[1]; })); }
-    function draw() {
-      cx.fillStyle = '#050200'; cx.fillRect(0, 0, W * C, H * C);
-      cx.fillStyle = 'rgba(255, 210, 63, 0.08)'; for (var x = 0; x < W; x++) for (var y = 0; y < H; y++) cx.fillRect(x * C + 5, y * C + 5, 2, 2);
-      cx.fillStyle = '#ff3b5c'; cx.fillRect(food[0] * C + 2, food[1] * C + 2, C - 4, C - 4);
-      body.forEach(function (p, i) { cx.fillStyle = i ? '#ffd23f' : '#fff3b0'; cx.fillRect(p[0] * C + 1, p[1] * C + 1, C - 2, C - 2); });
-    }
-    function end() {
-      alive = false; document.removeEventListener('keydown', key); cv.removeEventListener('touchstart', ts); cv.removeEventListener('touchend', te);
-      var msg = 'КОНЕЦ ИГРЫ · СЧЁТ ' + score;
-      if (score > rec) {
-        try { localStorage.setItem('gamelog.snake.' + user.id, String(score)); } catch (e) {}
-        var gain = (score - rec) * 2; addBonus(gain); sfx('win'); toast('Рекорд змейки! +' + gain + ' XP', 'ach'); msg = 'НОВЫЙ РЕКОРД: ' + score + ' · +' + gain + ' XP';
-      } else sfx('eject');
-      var box = document.querySelector('.snk');
-      if (box) box.insertAdjacentHTML('beforeend', '<div class="snk-over"><b>' + msg + '</b><button type="button" data-snake="start">ЕЩЁ РАЗ</button><button type="button" data-snake="exit">ВЫХОД</button></div>');
-    }
-    function step() {
-      if (!alive) return;
-      if (!document.body.contains(cv)) { alive = false; snake.on = false; document.removeEventListener('keydown', key); return; }
-      dir = nd;
-      var h = [body[0][0] + dir[0], body[0][1] + dir[1]];
-      if (h[0] < 0 || h[1] < 0 || h[0] >= W || h[1] >= H || body.some(function (p) { return p[0] === h[0] && p[1] === h[1]; })) return end();
-      body.unshift(h);
-      if (h[0] === food[0] && h[1] === food[1]) { score++; $('#snk-s').textContent = score; sfx('tick'); delay = Math.max(65, delay - 3); put(); } else body.pop();
-      draw(); setTimeout(step, delay);
-    }
-    function turn(dx, dy) { if (dx !== -dir[0] || dy !== -dir[1]) nd = [dx, dy]; }
-    function key(e) {
-      var m = { ArrowLeft: [-1, 0], KeyA: [-1, 0], ArrowRight: [1, 0], KeyD: [1, 0], ArrowUp: [0, -1], KeyW: [0, -1], ArrowDown: [0, 1], KeyS: [0, 1] }[e.code];
-      if (e.key === 'Escape') { alive = false; snake.on = false; document.removeEventListener('keydown', key); scrAttract(); return; }
-      if (m) { e.preventDefault(); turn(m[0], m[1]); }
-    }
-    var tx = 0, ty = 0;
-    function ts(e) { tx = e.touches[0].clientX; ty = e.touches[0].clientY; }
-    function te(e) {
-      var dx = e.changedTouches[0].clientX - tx, dy = e.changedTouches[0].clientY - ty;
-      if (Math.abs(dx) < 12 && Math.abs(dy) < 12) return;
-      if (Math.abs(dx) > Math.abs(dy)) turn(dx > 0 ? 1 : -1, 0); else turn(0, dy > 0 ? 1 : -1);
-    }
-    document.addEventListener('keydown', key); cv.addEventListener('touchstart', ts, { passive: true }); cv.addEventListener('touchend', te);
-    draw(); setTimeout(step, 400);
-  }
-
   /* демо-режим: экран сам листает игры, если долго ничего не трогать */
   var lastAct = Date.now(), demoOn = false, demoAt = 0, demoI = 0;
   function actNow() {
@@ -979,7 +984,7 @@
   }
   ['mousemove', 'mousedown', 'keydown', 'touchstart', 'wheel'].forEach(function (ev) { document.addEventListener(ev, actNow, { passive: true }); });
   setInterval(function () {
-    if (view.mode !== 'shelf' || snake.on || !$('#scr') || !games.length || !fxOn()) return;
+    if (view.mode !== 'shelf' || selId || !$('#scr') || !games.length || !fxOn()) return;
     if (Date.now() - lastAct < 25000 || (demoOn && Date.now() - demoAt < 3500)) return;
     demoOn = true; demoAt = Date.now(); scrId = null;
     scrShow(games[demoI++ % games.length].id);
@@ -1144,13 +1149,13 @@
     }, 'image/png');
   }
   function setMode(m) {
-    view.mode = m; shelfBoot = m === 'shelf'; try { localStorage.setItem('gamelog.view', m); } catch (e) {}
+    selId = null; view.mode = m; shelfBoot = m === 'shelf'; try { localStorage.setItem('gamelog.view', m); } catch (e) {}
     $('#vmode').textContent = m === 'shelf' ? 'Карточки' : 'Полка';
     renderGrid();
   }
 
   /* ---------- Beta v2.0: ники, друзья, достижения ---------- */
-  var VERSION = 'Beta v3.3';
+  var VERSION = 'Beta v3.4';
   var NICK_RE = /^[A-Za-z0-9_А-Яа-яЁё]{3,20}$/;
   var me = { nick: '', share: true, avatar: 0, bio: '', fav: '' };
   var rel = { friends: [], incoming: [], outgoing: [] };
@@ -1612,14 +1617,15 @@
       me.bio = bio; me.fav = fav; toast('Профиль сохранён');
     });
     dragInit();
+    $('#grid').addEventListener('click', function (e) { var b = e.target.closest && e.target.closest('[data-scr]'); if (b) scrAction(b.getAttribute('data-scr')); });
+    $('#grid').addEventListener('submit', function (e) { if (e.target.id === 'scr-form') { e.preventDefault(); scrSave(e.target); } });
+    $('#grid').addEventListener('input', function (e) { if (e.target.id === 'se-p') $('#se-pv').textContent = e.target.value + '%'; });
     try { var sv = localStorage.getItem('gamelog.sort'); if (sv && $('#sort').querySelector('option[value="' + sv + '"]')) { view.sort = sv; $('#sort').value = sv; } } catch (e) {}
     $('#grid').addEventListener('keydown', shelfNav);
     $('#grid').addEventListener('mouseover', shelfOver);
     $('#grid').addEventListener('mouseout', shelfOver);
     $('#grid').addEventListener('focusin', shelfOver);
     $('#grid').addEventListener('click', function (e) {
-      var sn = e.target.closest && e.target.closest('[data-snake]');
-      if (sn) { var a = sn.getAttribute('data-snake'); if (a === 'exit') { snake.on = false; scrAttract(); } else snakeStart(); return; }
       var d = e.target.closest && e.target.closest('.deck'); if (!d) return;
       if (e.target.closest('#paint')) { cabNext(); return; }
       var cb = e.target.closest('#coin');
