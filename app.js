@@ -54,7 +54,6 @@
   var recovering = false;
   var chains = {};
   var view = { tab: 'all', q: '', sort: 'updated', mode: 'cards' };
-  try { if (localStorage.getItem('gamelog.view') === 'shelf') view.mode = 'shelf'; } catch (e) {}
   var draft = null;
   var opener = null;
   var toastTimer = null;
@@ -103,11 +102,17 @@
     }
     return '<svg viewBox="0 0 7 7" width="100%" height="100%" aria-hidden="true">' + out + '</svg>';
   }
+  function starHtml(i, n, size) {
+    if (n >= i) return '<span>' + pix(STAR, size) + '</span>';
+    if (n >= i - 0.5) return '<span class="off sx">' + pix(STAR, size) + '<span class="hh">' + pix(STAR, size) + '</span></span>';
+    return '<span class="off">' + pix(STAR, size) + '</span>';
+  }
   function stars(n, size) {
     var out = '<span class="stars" role="img" aria-label="Оценка ' + n + ' из 5">';
-    for (var i = 1; i <= 5; i++) out += '<span class="' + (i <= n ? '' : 'off') + '">' + pix(STAR, size) + '</span>';
+    for (var i = 1; i <= 5; i++) out += starHtml(i, n, size);
     return out + '</span>';
   }
+  function starsTxt(n) { return '★'.repeat(Math.floor(n)) + (n % 1 ? '½' : ''); }
   function seg(n, total) {
     var out = '';
     for (var i = 0; i < total; i++) out += '<i class="' + (i < n ? 'on' : '') + '"></i>';
@@ -140,7 +145,7 @@
   function fromRow(r) {
     return {
       id: r.id, title: r.title, platform: r.platform || '', genre: r.genre || '', status: r.status,
-      progress: r.progress || 0, hours: Number(r.hours) || 0, rating: r.rating || 0, notes: r.notes || '',
+      progress: r.progress || 0, hours: Number(r.hours) || 0, rating: Number(r.rating) || 0, notes: r.notes || '',
       cover_path: r.cover_path || null, cover: coverUrl(r.cover_path, r.updated_at),
       updated: Date.parse(r.updated_at) || 0, added: Date.parse(r.created_at) || 0, coop: r.coop_with || null
     };
@@ -150,7 +155,7 @@
       id: g.id, user_id: user.id, title: g.title, platform: g.platform || '', genre: g.genre || '',
       status: g.status, progress: Math.max(0, Math.min(100, Math.round(g.progress || 0))),
       hours: Math.max(0, Math.min(99999, Math.round((Number(g.hours) || 0) * 10) / 10)),
-      rating: Math.max(0, Math.min(5, Math.round(g.rating || 0))), notes: g.notes || '', cover_path: path || null, coop_with: g.coop || null
+      rating: Math.max(0, Math.min(5, Math.round((Number(g.rating) || 0) * 2) / 2)), notes: g.notes || '', cover_path: path || null, coop_with: g.coop || null
     };
   }
   function queue(id, fn) {
@@ -394,9 +399,9 @@
     }).join('');
   }
   function drawRate() {
-    var h = '';
-    for (var i = 1; i <= 5; i++) h += '<button class="rs' + (i <= draft.rating ? ' on' : '') + '" type="button" data-r="' + i + '" aria-label="Оценка ' + i + '">' + pix(STAR, 26) + '</button>';
-    h += '<small>' + (draft.rating ? draft.rating + ' из 5' : 'без оценки') + '</small>';
+    var h = '', r = draft.rating || 0;
+    for (var i = 1; i <= 5; i++) h += '<button class="rs" type="button" data-r="' + i + '" aria-label="Оценка ' + i + ' (левая половина: ' + (i - 0.5) + ')">' + starHtml(i, r, 28) + '</button>';
+    h += '<small>' + (r ? r + ' из 5' : 'без оценки') + '</small>';
     $('#f-rate').innerHTML = h;
   }
   function drawCover() {
@@ -710,7 +715,8 @@
     });
     $('#f-rate').addEventListener('click', function (e) {
       var b = e.target.closest('[data-r]'); if (!b) return;
-      var v = Number(b.getAttribute('data-r'));
+      var v = Number(b.getAttribute('data-r')), rc = b.getBoundingClientRect();
+      if (e.detail > 0 && e.clientX - rc.left < rc.width / 2) v -= 0.5;
       draft.rating = draft.rating === v ? 0 : v; drawRate();
     });
     $('#f-pick').addEventListener('click', function () { $('#f-file').click(); });
@@ -786,6 +792,7 @@
   var LEAF = ['XXXXXX.', 'X....XX', 'X.XXX.X', 'X.....X', 'X.XXX.X', 'X.....X', 'X.XX..X', 'XXXXXXX'];
   var coopMap = {};
   var RELEASES = [
+    ['Beta v3.5', ['Оценка с половинками звёзд: 0.5, 1.5, 2.5 и так далее', 'Режим «Полка» пока скрыт']],
     ['Beta v3.4', ['Змейка убрана', 'Полка: выбор картриджа показывает игру на экране автомата', 'Изменить и удалить игру можно прямо на экране автомата']],
     ['Beta v3.3', ['Демо-режим: экран сам листает игры, если ничего не трогать', 'Змейка на экране автомата: рекорд даёт бонус XP', 'Расцветки корпуса по уровню: КЛАССИКА, КОСМО, РЕТРО, ЗОЛОТО (кнопка «КРАСКА»)', 'Перетаскивание картриджей на полке, сортировка «Мой порядок»']],
     ['Beta v3.2', ['Полка стала полноценным автоматом: вывеска, CRT-экран с данными игры, пульт с джойстиками и кнопкой «Монета», отсек картриджей, цоколь', 'Экран показывает игру под курсором, в покое «ВСТАВЬ МОНЕТУ» и лидера по часам', 'Надписи автомата не выделяются']],
@@ -903,7 +910,7 @@
       '<div class="scr-txt"><b class="scr-t">' + esc(g.title) + '</b><span class="scr-st"><i></i>' + st.label + (g.platform ? ' · ' + esc(g.platform) : '') + '</span>' +
       '<span class="scr-r"><u>ЧАСОВ</u>' + fmtK(g.hours) + '</span>' +
       (g.status !== 'wish' ? '<span class="scr-r"><u>ПРОГРЕСС</u>' + p + '%</span><div class="segbar" style="--c:' + st.color + '">' + seg(Math.round(p / 10), 10) + '</div>' : '') +
-      (g.rating > 0 ? '<span class="scr-r"><u>ОЦЕНКА</u>' + '★'.repeat(g.rating) + '</span>' : '') +
+      (g.rating > 0 ? '<span class="scr-r"><u>ОЦЕНКА</u>' + starsTxt(g.rating) + '</span>' : '') +
       (cf ? '<span class="scr-r"><u>2P · ' + esc(cf.nick) + '</u>' + (cp != null ? cp + '%' : '—') + '</span>' : '') +
       (g.notes ? '<span class="scr-n">' + esc(g.notes) + '</span>' : '') +
       (selId === id ? '<div class="scr-act">' + (viewing ? '' : '<button type="button" data-scr="edit">ИЗМЕНИТЬ</button><button type="button" data-scr="full">ОБЛОЖКА И ВСЁ ОСТАЛЬНОЕ</button>') + '<button type="button" data-scr="close">ЗАКРЫТЬ ✕</button></div>' : '') + '</div></div>';
@@ -925,7 +932,7 @@
     scrId = 'edit:' + id;
     function inp(label, idn, val, extra) { return '<label class="sf"><span>' + label + '</span><input id="' + idn + '" value="' + esc(val) + '" ' + (extra || '') + ' autocomplete="off"></label>'; }
     var so = ORDER.map(function (k) { return '<option value="' + k + '"' + (g.status === k ? ' selected' : '') + '>' + STATUS[k].label + '</option>'; }).join('');
-    var ro = [0, 1, 2, 3, 4, 5].map(function (k) { return '<option value="' + k + '"' + ((g.rating || 0) === k ? ' selected' : '') + '>' + (k ? '★'.repeat(k) : 'Без оценки') + '</option>'; }).join('');
+    var ro = [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5].map(function (k) { return '<option value="' + k + '"' + ((g.rating || 0) === k ? ' selected' : '') + '>' + (k ? k + ' ★' : 'Без оценки') + '</option>'; }).join('');
     var co = '<option value="">Один</option>' + rel.friends.map(function (f) { return '<option value="' + esc(f.uid) + '"' + (g.coop === f.uid ? ' selected' : '') + '>' + esc(f.nick) + '</option>'; }).join('');
     el.innerHTML = '<form class="scr-form" id="scr-form" data-id="' + esc(id) + '" novalidate><b class="scr-t">ИЗМЕНИТЬ КАРТРИДЖ</b><div class="sf-grid">' +
       inp('Название', 'se-t', g.title, 'maxlength="80"') + inp('Платформа', 'se-pl', g.platform, 'maxlength="30"') + inp('Жанр', 'se-g', g.genre, 'maxlength="30"') +
@@ -1155,7 +1162,7 @@
   }
 
   /* ---------- Beta v2.0: ники, друзья, достижения ---------- */
-  var VERSION = 'Beta v3.4';
+  var VERSION = 'Beta v3.5';
   var NICK_RE = /^[A-Za-z0-9_А-Яа-яЁё]{3,20}$/;
   var me = { nick: '', share: true, avatar: 0, bio: '', fav: '' };
   var rel = { friends: [], incoming: [], outgoing: [] };

@@ -13,7 +13,7 @@ create table if not exists public.games (
   status      text not null default 'queue' check (status in ('playing', 'queue', 'beaten', 'wish', 'dropped')),
   progress    smallint not null default 0 check (progress between 0 and 100),
   hours       numeric(6, 1) not null default 0 check (hours >= 0 and hours <= 99999),
-  rating      smallint not null default 0 check (rating between 0 and 5),
+  rating      numeric(2, 1) not null default 0 check (rating >= 0 and rating <= 5 and (rating * 2) = round(rating * 2)),
   notes       text not null default '' check (char_length(notes) <= 300),
   cover_path  text check (cover_path is null or char_length(cover_path) <= 120),
   created_at  timestamptz not null default now(),

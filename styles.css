@@ -768,3 +768,13 @@ html[data-fx="off"] body::after { display: none; }
 .scr-form .sf-del { margin-left: auto; color: #ff3b5c; border-color: #ff3b5c; }
 .scr-form .sf-del:hover, .scr-form .sf-del.armed { background: #ff3b5c; color: #000; }
 @media (max-width: 640px) { .sf-grid { grid-template-columns: 1fr 1fr; } }
+
+/* Beta v3.5: половинки звёзд */
+#vmode[hidden] { display: none; }
+.sx { position: relative; display: inline-block; line-height: 0; }
+.sx .hh { position: absolute; left: 0; top: 0; width: 50%; overflow: hidden; color: var(--star); line-height: 0; }
+.rs { position: relative; line-height: 0; }
+.rs .sx, .rs > span { display: inline-block; }
+.rs > span { color: var(--star); }
+.rs > span.off { color: var(--faint); }
+.rs.on { color: inherit; }
